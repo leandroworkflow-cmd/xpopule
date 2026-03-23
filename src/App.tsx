@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Portfolio from "./pages/Portfolio";
 import Carteira from "./pages/Carteira";
 import Admin from "./pages/Admin";
+import AdminFinanceiro from "./pages/AdminFinanceiro";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import ResetPassword from "./pages/ResetPassword";
