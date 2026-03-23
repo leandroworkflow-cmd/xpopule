@@ -1,6 +1,7 @@
-import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase } from "lucide-react";
+import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase, Shield } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Sidebar,
   SidebarContent,
@@ -24,21 +25,24 @@ const categories = [
   { title: "Esportes", url: "/?cat=esportes", icon: Trophy },
 ];
 
-const pages = [
-  { title: "Portfólio", url: "/portfolio", icon: Briefcase },
-];
-
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const currentPath = location.pathname + location.search;
+  const { user, balance, isAdmin } = useAuth();
 
   const isActive = (url: string) => {
     if (url === "/") return location.pathname === "/" && !location.search;
     if (url.startsWith("/?")) return currentPath === url;
     return location.pathname === url;
   };
+
+  const pages = [
+    { title: "Portfólio", url: "/portfolio", icon: Briefcase },
+    { title: "Carteira", url: "/carteira", icon: Wallet },
+    ...(isAdmin ? [{ title: "Admin", url: "/admin", icon: Shield }] : []),
+  ];
 
   return (
     <Sidebar collapsible="icon">
@@ -84,40 +88,44 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider">
-            Minha Conta
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {pages.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end
-                      className="hover:bg-accent/50 transition-colors"
-                      activeClassName="bg-accent text-primary font-medium"
-                    >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {user && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider">
+              Minha Conta
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {pages.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        end
+                        className="hover:bg-accent/50 transition-colors"
+                        activeClassName="bg-accent text-primary font-medium"
+                      >
+                        <item.icon className="mr-2 h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4">
-        {!collapsed && (
+        {!collapsed && user && (
           <div className="rounded-lg bg-accent p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Wallet className="h-3 w-3" />
               Saldo Disponível
             </div>
-            <div className="text-foreground font-bold text-lg">R$ 1.250,00</div>
+            <div className="text-foreground font-bold text-lg">
+              R$ {balance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </div>
           </div>
         )}
       </SidebarFooter>
