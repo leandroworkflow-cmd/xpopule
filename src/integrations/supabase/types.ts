@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_fees: {
+        Row: {
+          amount: number
+          created_at: string
+          fee_type: string
+          id: string
+          transaction_id: string | null
+          withdrawal_request_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fee_type: string
+          id?: string
+          transaction_id?: string | null
+          withdrawal_request_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fee_type?: string
+          id?: string
+          transaction_id?: string | null
+          withdrawal_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_fees_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_fees_withdrawal_request_id_fkey"
+            columns: ["withdrawal_request_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawal_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           avg_price: number
@@ -185,6 +227,45 @@ export type Database = {
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      withdrawal_requests: {
+        Row: {
+          amount: number
+          created_at: string
+          fee: number
+          id: string
+          net_amount: number
+          pix_key: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fee?: number
+          id?: string
+          net_amount: number
+          pix_key: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fee?: number
+          id?: string
+          net_amount?: number
+          pix_key?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: []

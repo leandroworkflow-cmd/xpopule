@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Portfolio from "./pages/Portfolio";
 import Carteira from "./pages/Carteira";
 import Admin from "./pages/Admin";
+import AdminFinanceiro from "./pages/AdminFinanceiro";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import ResetPassword from "./pages/ResetPassword";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/portfolio" element={<AppLayout><Portfolio /></AppLayout>} />
             <Route path="/carteira" element={<AppLayout><Carteira /></AppLayout>} />
             <Route path="/admin" element={<AppLayout><Admin /></AppLayout>} />
+            <Route path="/admin/financeiro" element={<AppLayout><AdminFinanceiro /></AppLayout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
