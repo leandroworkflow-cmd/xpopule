@@ -10,17 +10,17 @@ import { Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
-const FIXED_FEE = 0.05;
-const VARIABLE_FEE_RATE = 0.02;
+const PAYOUT = 100;
+const FEE_RATE = 0.01;
+const QUICK_QUANTITIES = [1, 5, 10];
 
 function calcFees(qty: number, pricePerContract: number) {
   const subtotal = qty * pricePerContract;
-  const variableFee = subtotal * VARIABLE_FEE_RATE;
-  const totalFees = FIXED_FEE + variableFee;
-  const totalCost = subtotal + totalFees;
-  const potentialReturn = qty * 1.0;
+  const fee = subtotal * FEE_RATE;
+  const totalCost = subtotal + fee;
+  const potentialReturn = qty * PAYOUT;
   const netProfit = potentialReturn - totalCost;
-  return { subtotal, variableFee, totalFees, totalCost, potentialReturn, netProfit };
+  return { subtotal, fee, totalCost, potentialReturn, netProfit };
 }
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -33,21 +33,22 @@ interface TradingDrawerProps {
 
 export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
-  const [quantity, setQuantity] = useState("10");
+  const [quantity, setQuantity] = useState("1");
   const { balance, user } = useAuth();
 
   if (!market) return null;
 
-  const priceInCents = side === "yes" ? market.yesPrice : market.noPrice;
-  const priceInReais = priceInCents / 100;
-  const qty = parseInt(quantity) || 0;
-  const fees = calcFees(qty, priceInReais);
+  // Price now represents R$ 1–99 (stored as 1–99 in yesPrice/noPrice)
+  const price = side === "yes" ? market.yesPrice : market.noPrice;
+  const qty = parseFloat(quantity) || 0;
+  const fees = calcFees(qty, price);
   const isUp = market.history.length > 1 && market.history[market.history.length - 1].price > market.history[0].price;
   const insufficientBalance = user && fees.totalCost > balance;
+  const invalidQty = qty < 0.1;
 
   const handleOrder = () => {
-    if (qty <= 0) {
-      toast.error("Insira uma quantidade válida.");
+    if (invalidQty) {
+      toast.error("Quantidade mínima: 0.1 contrato.");
       return;
     }
     if (!user) {
@@ -59,7 +60,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
       return;
     }
     toast.success(
-      `Ordem executada! Comprou ${qty} contratos de "${side === "yes" ? "Sim" : "Não"}" por R$ ${fmt(fees.totalCost)}.`
+      `Ordem executada! Comprou ${fmt(qty)} contratos de "${side === "yes" ? "Sim" : "Não"}" por R$ ${fmt(fees.totalCost)}.`
     );
     onClose();
   };
@@ -92,7 +93,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
                 <Tooltip
                   contentStyle={{ background: "hsl(220, 18%, 12%)", border: "1px solid hsl(220, 14%, 18%)", borderRadius: 8, fontSize: 12 }}
                   labelStyle={{ color: "hsl(215, 14%, 55%)" }}
-                  formatter={(value: number) => [`${value}¢`, "Preço"]}
+                  formatter={(value: number) => [`R$ ${value},00`, "Preço"]}
                 />
                 <Area type="monotone" dataKey="price" stroke={isUp ? "hsl(152, 60%, 48%)" : "hsl(350, 65%, 55%)"} strokeWidth={2} fill="url(#tradeGradient)" />
               </AreaChart>
@@ -108,7 +109,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             >
               <div className="text-center">
                 <div className="font-bold">Sim</div>
-                <div className="text-xs opacity-80">R$ {fmt(market.yesPrice / 100)}</div>
+                <div className="text-xs opacity-80">R$ {fmt(market.yesPrice)}</div>
               </div>
             </Button>
             <Button
@@ -118,36 +119,53 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             >
               <div className="text-center">
                 <div className="font-bold">Não</div>
-                <div className="text-xs opacity-80">R$ {fmt(market.noPrice / 100)}</div>
+                <div className="text-xs opacity-80">R$ {fmt(market.noPrice)}</div>
               </div>
             </Button>
           </div>
 
-          {/* Quantity */}
+          {/* Quick quantity buttons */}
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Quantidade de Contratos</label>
+            <label className="text-sm text-muted-foreground mb-2 block">Quantidade Rápida</label>
+            <div className="grid grid-cols-3 gap-2">
+              {QUICK_QUANTITIES.map((q) => (
+                <Button
+                  key={q}
+                  variant={parseFloat(quantity) === q ? "secondary" : "outline"}
+                  size="sm"
+                  className="h-10 flex-col gap-0"
+                  onClick={() => setQuantity(String(q))}
+                >
+                  <span className="font-bold">{q}x</span>
+                  <span className="text-[10px] opacity-70">R$ {fmt(q * price)}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom quantity */}
+          <div>
+            <label className="text-sm text-muted-foreground mb-2 block">Quantidade Personalizada</label>
             <Input
               type="number"
-              min="1"
+              min="0.1"
+              step="0.1"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               className="bg-background border-border text-foreground text-lg h-12"
             />
+            <p className="text-xs text-muted-foreground mt-1">Mínimo: 0.1 contrato (R$ {fmt(price * 0.1)})</p>
           </div>
 
           {/* Fee breakdown */}
           <div className="rounded-lg bg-background/50 p-4 space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Investimento ({qty}x R$ {fmt(priceInReais)})</span>
+              <span className="text-muted-foreground">Investimento ({fmt(qty)}x R$ {fmt(price)})</span>
               <span className="text-foreground font-medium">R$ {fmt(fees.subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Taxa fixa</span>
-              <span className="text-foreground">R$ {fmt(FIXED_FEE)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Taxa variável (2%)</span>
-              <span className="text-foreground">R$ {fmt(fees.variableFee)}</span>
+              <span className="text-muted-foreground">Taxa de negociação (1%)</span>
+              <span className="text-foreground">R$ {fmt(fees.fee)}</span>
             </div>
             <div className="border-t border-border pt-3 flex justify-between text-sm">
               <span className="text-muted-foreground font-semibold">Custo Total</span>
@@ -166,7 +184,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Cada contrato paga R$ 1,00 se estiver correto.
+              Cada contrato paga R$ {fmt(PAYOUT)} se estiver correto.
             </p>
           </div>
 
@@ -185,7 +203,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             variant={side === "yes" ? "success" : "danger"}
             className="w-full h-12 text-base font-bold"
             onClick={handleOrder}
-            disabled={!!insufficientBalance || qty <= 0}
+            disabled={!!insufficientBalance || invalidQty}
           >
             Comprar {side === "yes" ? "Sim" : "Não"} — R$ {fmt(fees.totalCost)}
           </Button>
