@@ -32,6 +32,7 @@ const App = () => (
             <Route path="/portfolio" element={<AppLayout><Portfolio /></AppLayout>} />
             <Route path="/carteira" element={<AppLayout><Carteira /></AppLayout>} />
             <Route path="/admin" element={<AppLayout><Admin /></AppLayout>} />
+            <Route path="/admin/financeiro" element={<AppLayout><AdminFinanceiro /></AppLayout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
