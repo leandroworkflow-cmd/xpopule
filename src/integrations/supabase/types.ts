@@ -14,16 +14,196 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      markets: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          no_price: number
+          resolution_rule: string
+          status: string
+          title: string
+          updated_at: string
+          volume: number
+          yes_price: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          no_price?: number
+          resolution_rule?: string
+          status?: string
+          title: string
+          updated_at?: string
+          volume?: number
+          yes_price?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          no_price?: number
+          resolution_rule?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          volume?: number
+          yes_price?: number
+        }
+        Relationships: []
+      }
+      positions: {
+        Row: {
+          avg_price: number
+          created_at: string
+          id: string
+          market_id: string
+          quantity: number
+          side: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_price?: number
+          created_at?: string
+          id?: string
+          market_id: string
+          quantity?: number
+          side: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_price?: number
+          created_at?: string
+          id?: string
+          market_id?: string
+          quantity?: number
+          side?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "positions_market_id_fkey"
+            columns: ["market_id"]
+            isOneToOne: false
+            referencedRelation: "markets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          balance: number
+          created_at: string
+          email: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          email?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          email?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          market_id: string | null
+          price_per_contract: number | null
+          quantity: number | null
+          side: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          market_id?: string | null
+          price_per_contract?: number | null
+          quantity?: number | null
+          side?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          market_id?: string | null
+          price_per_contract?: number | null
+          quantity?: number | null
+          side?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_market_id_fkey"
+            columns: ["market_id"]
+            isOneToOne: false
+            referencedRelation: "markets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +330,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
