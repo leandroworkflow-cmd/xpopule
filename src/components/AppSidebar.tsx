@@ -1,4 +1,4 @@
-import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase, Shield } from "lucide-react";
+import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase, Shield, DollarSign } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
