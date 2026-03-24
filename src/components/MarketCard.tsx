@@ -15,7 +15,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
   return (
     <div
-      onClick={() => onClick(market)}
+      onClick={() => navigate(`/mercado/${market.id}`)}
       className="gradient-card rounded-xl border border-border p-4 hover:border-primary/40 transition-all cursor-pointer group flex flex-col"
     >
       {/* Image */}
