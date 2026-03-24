@@ -8,6 +8,7 @@ interface MarketCardProps {
 }
 
 export function MarketCard({ market, onClick }: MarketCardProps) {
+  const navigate = useNavigate();
   const catLabel = categoryLabels[market.category] || market.category;
   const catColor = categoryColors[market.category] || "bg-muted text-muted-foreground";
   const endDate = new Date(market.end_date).toLocaleDateString("pt-BR");
