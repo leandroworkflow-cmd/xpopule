@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { DBMarket, categoryLabels, categoryColors } from "@/types/market";
 import { Calendar, Trophy } from "lucide-react";
 
