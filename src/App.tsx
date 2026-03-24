@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import MarketDetail from "./pages/MarketDetail";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/cadastro" element={<Cadastro />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<AppLayout><Index /></AppLayout>} />
+            <Route path="/mercado/:id" element={<AppLayout><MarketDetail /></AppLayout>} />
             <Route path="/portfolio" element={<AppLayout><Portfolio /></AppLayout>} />
             <Route path="/carteira" element={<AppLayout><Carteira /></AppLayout>} />
             <Route path="/admin" element={<AppLayout><Admin /></AppLayout>} />
