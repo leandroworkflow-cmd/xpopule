@@ -1,30 +1,35 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { markets, MarketCategory, categoryLabels } from "@/data/markets";
-import { MarketCard } from "@/components/MarketCard";
+import { MarketCard, MarketCardSkeleton } from "@/components/MarketCard";
 import { TradingDrawer } from "@/components/TradingDrawer";
-import { Market } from "@/data/markets";
+import { DBMarket, categoryLabels } from "@/types/market";
+import { useMarkets } from "@/hooks/useMarkets";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
 const Index = () => {
   const [searchParams] = useSearchParams();
-  const category = searchParams.get("cat") as MarketCategory | null;
-  const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
+  const category = searchParams.get("cat");
+  const [selectedMarket, setSelectedMarket] = useState<DBMarket | null>(null);
   const [search, setSearch] = useState("");
 
+  const { data: markets, isLoading } = useMarkets(category);
+
   const filtered = useMemo(() => {
-    let result = markets;
-    if (category) result = result.filter((m) => m.category === category);
-    if (search) result = result.filter((m) => m.title.toLowerCase().includes(search.toLowerCase()));
-    return result;
-  }, [category, search]);
+    if (!markets) return [];
+    if (!search) return markets;
+    return markets.filter((m) =>
+      m.title.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [markets, search]);
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground mb-1">
-          {category ? categoryLabels[category] : "Mercados em Destaque"}
+          {category && categoryLabels[category]
+            ? categoryLabels[category]
+            : "Mercados em Destaque"}
         </h1>
         <p className="text-sm text-muted-foreground">
           Negocie contratos baseados em eventos do mundo real.
@@ -41,13 +46,21 @@ const Index = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((market) => (
-          <MarketCard key={market.id} market={market} onClick={setSelectedMarket} />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <MarketCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((market) => (
+            <MarketCard key={market.id} market={market} onClick={setSelectedMarket} />
+          ))}
+        </div>
+      )}
 
-      {filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           Nenhum mercado encontrado.
         </div>
