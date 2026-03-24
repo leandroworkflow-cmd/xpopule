@@ -19,8 +19,11 @@ export type Database = {
           category: string
           created_at: string
           created_by: string | null
+          description: string | null
           end_date: string
+          external_id: string | null
           id: string
+          image_url: string | null
           no_price: number
           resolution_rule: string
           status: string
@@ -33,8 +36,11 @@ export type Database = {
           category: string
           created_at?: string
           created_by?: string | null
+          description?: string | null
           end_date: string
+          external_id?: string | null
           id?: string
+          image_url?: string | null
           no_price?: number
           resolution_rule?: string
           status?: string
@@ -47,8 +53,11 @@ export type Database = {
           category?: string
           created_at?: string
           created_by?: string | null
+          description?: string | null
           end_date?: string
+          external_id?: string | null
           id?: string
+          image_url?: string | null
           no_price?: number
           resolution_rule?: string
           status?: string

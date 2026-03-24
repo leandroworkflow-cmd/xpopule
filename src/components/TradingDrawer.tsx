@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { Market } from "@/data/markets";
+import { DBMarket, categoryLabels } from "@/types/market";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { categoryLabels } from "@/data/markets";
 import { Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,7 +24,7 @@ function calcFees(qty: number, pricePerContract: number) {
 const fmt = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface TradingDrawerProps {
-  market: Market | null;
+  market: DBMarket | null;
   open: boolean;
   onClose: () => void;
 }
@@ -38,13 +36,12 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
 
   if (!market) return null;
 
-  // Price now represents R$ 1–99 (stored as 1–99 in yesPrice/noPrice)
-  const price = side === "yes" ? market.yesPrice : market.noPrice;
+  const price = side === "yes" ? market.yes_price : market.no_price;
   const qty = parseFloat(quantity) || 0;
   const fees = calcFees(qty, price);
-  const isUp = market.history.length > 1 && market.history[market.history.length - 1].price > market.history[0].price;
   const insufficientBalance = user && fees.totalCost > balance;
   const invalidQty = qty < 0.1;
+  const catLabel = categoryLabels[market.category] || market.category;
 
   const handleOrder = () => {
     if (invalidQty) {
@@ -70,36 +67,14 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
       <SheetContent className="w-full sm:max-w-md bg-card border-border overflow-y-auto">
         <SheetHeader>
           <Badge variant="secondary" className="w-fit text-xs">
-            {categoryLabels[market.category]}
+            {catLabel}
           </Badge>
-          <SheetTitle className="text-foreground text-left text-lg leading-snug mt-2">
+          <SheetTitle className="text-foreground text-left text-lg leading-snug mt-2 capitalize">
             {market.title}
           </SheetTitle>
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Chart */}
-          <div className="h-40 rounded-lg bg-background/50 p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={market.history}>
-                <defs>
-                  <linearGradient id="tradeGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={isUp ? "hsl(152, 60%, 48%)" : "hsl(350, 65%, 55%)"} stopOpacity={0.3} />
-                    <stop offset="100%" stopColor={isUp ? "hsl(152, 60%, 48%)" : "hsl(350, 65%, 55%)"} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(215, 14%, 55%)" }} axisLine={false} tickLine={false} interval={6} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "hsl(215, 14%, 55%)" }} axisLine={false} tickLine={false} width={30} />
-                <Tooltip
-                  contentStyle={{ background: "hsl(220, 18%, 12%)", border: "1px solid hsl(220, 14%, 18%)", borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: "hsl(215, 14%, 55%)" }}
-                  formatter={(value: number) => [`R$ ${value},00`, "Preço"]}
-                />
-                <Area type="monotone" dataKey="price" stroke={isUp ? "hsl(152, 60%, 48%)" : "hsl(350, 65%, 55%)"} strokeWidth={2} fill="url(#tradeGradient)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
           {/* Side selection */}
           <div className="grid grid-cols-2 gap-3">
             <Button
@@ -109,7 +84,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             >
               <div className="text-center">
                 <div className="font-bold">Sim</div>
-                <div className="text-xs opacity-80">R$ {fmt(market.yesPrice)}</div>
+                <div className="text-xs opacity-80">R$ {fmt(market.yes_price)}</div>
               </div>
             </Button>
             <Button
@@ -119,7 +94,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             >
               <div className="text-center">
                 <div className="font-bold">Não</div>
-                <div className="text-xs opacity-80">R$ {fmt(market.noPrice)}</div>
+                <div className="text-xs opacity-80">R$ {fmt(market.no_price)}</div>
               </div>
             </Button>
           </div>
@@ -214,9 +189,9 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
               <Info className="h-4 w-4 text-primary" />
               Regras do Mercado
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">{market.resolution}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{market.resolution_rule}</p>
             <p className="text-xs text-muted-foreground mt-2">
-              Encerramento: {new Date(market.endDate).toLocaleDateString("pt-BR")}
+              Encerramento: {new Date(market.end_date).toLocaleDateString("pt-BR")}
             </p>
           </div>
         </div>

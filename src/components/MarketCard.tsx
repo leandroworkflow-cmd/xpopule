@@ -1,66 +1,82 @@
-import { Market } from "@/data/markets";
-import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { Badge } from "@/components/ui/badge";
-import { categoryLabels } from "@/data/markets";
+import { useNavigate } from "react-router-dom";
+import { DBMarket, categoryLabels, categoryColors } from "@/types/market";
+import { Calendar, Trophy } from "lucide-react";
 
 interface MarketCardProps {
-  market: Market;
-  onClick: (market: Market) => void;
+  market: DBMarket;
+  onClick: (market: DBMarket) => void;
 }
 
 export function MarketCard({ market, onClick }: MarketCardProps) {
-  const isUp = market.history.length > 1 && market.history[market.history.length - 1].price > market.history[0].price;
+  const navigate = useNavigate();
+  const catLabel = categoryLabels[market.category] || market.category;
+  const catColor = categoryColors[market.category] || "bg-muted text-muted-foreground";
+  const endDate = new Date(market.end_date).toLocaleDateString("pt-BR");
 
   return (
     <div
-      onClick={() => onClick(market)}
-      className="gradient-card rounded-xl border border-border p-4 hover:border-primary/30 transition-all cursor-pointer group"
+      onClick={() => navigate(`/mercado/${market.id}`)}
+      className="gradient-card rounded-xl border border-border p-4 hover:border-primary/40 transition-all cursor-pointer group flex flex-col"
     >
-      <div className="flex items-start justify-between mb-3">
-        <Badge variant="secondary" className="text-xs font-medium">
-          {categoryLabels[market.category]}
-        </Badge>
-        <span className="text-xs text-muted-foreground">
-          {new Date(market.endDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
-        </span>
-      </div>
+      {/* Image */}
+      {market.image_url && (
+        <div className="h-36 rounded-lg overflow-hidden mb-3 bg-background/50 flex items-center justify-center">
+          <img
+            src={market.image_url}
+            alt={market.title}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      )}
 
-      <h3 className="font-semibold text-sm text-foreground mb-4 leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+      {/* Category tag */}
+      <span className={`inline-flex items-center w-fit px-2.5 py-0.5 rounded-full text-[11px] font-semibold border mb-3 ${catColor}`}>
+        <Trophy className="h-3 w-3 mr-1" />
+        {catLabel}
+      </span>
+
+      {/* Title */}
+      <h3 className="font-bold text-sm text-foreground mb-3 leading-snug line-clamp-2 group-hover:text-primary transition-colors capitalize flex-1">
         {market.title}
       </h3>
 
-      <div className="h-12 mb-4">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={market.history}>
-            <defs>
-              <linearGradient id={`gradient-${market.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={isUp ? "hsl(152, 60%, 48%)" : "hsl(350, 65%, 55%)"} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={isUp ? "hsl(152, 60%, 48%)" : "hsl(350, 65%, 55%)"} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area
-              type="monotone"
-              dataKey="price"
-              stroke={isUp ? "hsl(152, 60%, 48%)" : "hsl(350, 65%, 55%)"}
-              strokeWidth={1.5}
-              fill={`url(#gradient-${market.id})`}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      {/* Deadline */}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4">
+        <Calendar className="h-3.5 w-3.5" />
+        <span>Encerra em: {endDate}</span>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          <button className="px-3 py-1.5 rounded-md text-xs font-bold bg-success/15 text-success hover:bg-success/25 transition-colors">
-            Sim {market.yesPrice}¢
-          </button>
-          <button className="px-3 py-1.5 rounded-md text-xs font-bold bg-danger/15 text-danger hover:bg-danger/25 transition-colors">
-            Não {market.noPrice}¢
-          </button>
-        </div>
-        <span className="text-xs text-muted-foreground">
-          Vol: {(market.volume / 1000).toFixed(0)}k
-        </span>
+      {/* Action buttons */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); onClick(market); }}
+          className="h-11 rounded-lg text-sm font-bold bg-success/15 text-success hover:bg-success/25 border border-success/30 transition-all"
+        >
+          SIM — R$ {market.yes_price}
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onClick(market); }}
+          className="h-11 rounded-lg text-sm font-bold bg-danger/15 text-danger hover:bg-danger/25 border border-danger/30 transition-all"
+        >
+          NÃO — R$ {market.no_price}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function MarketCardSkeleton() {
+  return (
+    <div className="gradient-card rounded-xl border border-border p-4 animate-pulse">
+      <div className="h-36 rounded-lg bg-muted/30 mb-3" />
+      <div className="h-5 w-20 rounded-full bg-muted/30 mb-3" />
+      <div className="h-4 w-full rounded bg-muted/30 mb-2" />
+      <div className="h-4 w-2/3 rounded bg-muted/30 mb-3" />
+      <div className="h-4 w-32 rounded bg-muted/30 mb-4" />
+      <div className="grid grid-cols-2 gap-2">
+        <div className="h-11 rounded-lg bg-muted/30" />
+        <div className="h-11 rounded-lg bg-muted/30" />
       </div>
     </div>
   );
