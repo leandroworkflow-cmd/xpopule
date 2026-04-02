@@ -195,9 +195,9 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             variant={side === "yes" ? "success" : "danger"}
             className="w-full h-12 text-base font-bold"
             onClick={handleOrder}
-            disabled={!!insufficientBalance || invalidQty}
+            disabled={loading || invalidQty}
           >
-            Comprar {side === "yes" ? "Sim" : "Não"} — R$ {fmt(fees.totalCost)}
+            {loading ? "Redirecionando..." : `Comprar ${side === "yes" ? "Sim" : "Não"} — R$ ${fmt(fees.totalCost)}`}
           </Button>
 
           {/* Rules */}
