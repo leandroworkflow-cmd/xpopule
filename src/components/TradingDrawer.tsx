@@ -35,6 +35,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [quantity, setQuantity] = useState("1");
   const { balance, user } = useAuth();
+  const navigate = useNavigate();
 
   if (!market) return null;
 
