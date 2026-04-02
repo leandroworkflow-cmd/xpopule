@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX orders_stripe_checkout_id_key ON public.orders (stripe_checkout_id) WHERE stripe_checkout_id IS NOT NULL;

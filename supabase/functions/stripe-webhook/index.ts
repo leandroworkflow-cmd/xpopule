@@ -45,6 +45,22 @@ serve(async (req) => {
 
     console.log(`Processing deposit: user=${userId}, amount=R$${amountTotal}`);
 
+    // Upsert order record
+    const { error: orderError } = await supabaseAdmin.from("orders").upsert(
+      {
+        user_id: userId,
+        stripe_checkout_id: session.id,
+        amount: amountTotal,
+        status: "paid",
+        description: `Depósito via Stripe`,
+      },
+      { onConflict: "stripe_checkout_id" }
+    );
+
+    if (orderError) {
+      console.error("Failed to upsert order:", orderError.message);
+    }
+
     // Update user balance
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
