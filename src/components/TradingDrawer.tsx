@@ -34,11 +34,11 @@ interface TradingDrawerProps {
 export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [quantity, setQuantity] = useState("1");
+  const [loading, setLoading] = useState(false);
   const { balance, user } = useAuth();
   const navigate = useNavigate();
 
   if (!market) return null;
-
   const price = side === "yes" ? market.yes_price : market.no_price;
   const qty = parseFloat(quantity) || 0;
   const fees = calcFees(qty, price);
