@@ -34,17 +34,19 @@ interface TradingDrawerProps {
 export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [quantity, setQuantity] = useState("1");
+  const [loading, setLoading] = useState(false);
   const { balance, user } = useAuth();
   const navigate = useNavigate();
 
   if (!market) return null;
-
   const price = side === "yes" ? market.yes_price : market.no_price;
   const qty = parseFloat(quantity) || 0;
   const fees = calcFees(qty, price);
   const insufficientBalance = user && fees.totalCost > balance;
   const invalidQty = qty < 0.1;
   const catLabel = categoryLabels[market.category] || market.category;
+
+
 
   const handleOrder = async () => {
     if (invalidQty) {
@@ -57,85 +59,23 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
       navigate(`/login?redirect=${encodeURIComponent(`/mercado/${market.id}`)}`);
       return;
     }
-    if (insufficientBalance) {
-      toast.error("Saldo insuficiente. Deposite via PIX para continuar.");
-      return;
-    }
 
+    setLoading(true);
     try {
-      // Debit balance
-      const newBalance = balance - fees.totalCost;
-      const { error: balanceError } = await supabase
-        .from("profiles")
-        .update({ balance: newBalance })
-        .eq("id", user.id);
-      if (balanceError) throw balanceError;
-
-      // Record transaction
-      const { error: txError } = await supabase.from("transactions").insert({
-        user_id: user.id,
-        type: "buy",
-        amount: -fees.totalCost,
-        market_id: market.id,
-        side,
-        quantity: qty,
-        price_per_contract: price,
-        description: `Compra ${fmt(qty)}x ${side === "yes" ? "Sim" : "Não"} — ${market.title}`,
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { amount: fees.totalCost },
       });
-      if (txError) throw txError;
 
-      // Record platform fee
-      const lastTx = await supabase
-        .from("transactions")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      if (error) throw error;
+      if (!data?.url) throw new Error("URL de pagamento não retornada.");
 
-      if (lastTx.data) {
-        await supabase.from("platform_fees").insert({
-          transaction_id: lastTx.data.id,
-          amount: fees.fee,
-          fee_type: "trading",
-        });
-      }
-
-      // Upsert position
-      const { data: existing } = await supabase
-        .from("positions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("market_id", market.id)
-        .eq("side", side)
-        .maybeSingle();
-
-      if (existing) {
-        const totalQty = existing.quantity + qty;
-        const newAvg = Math.round(
-          (existing.avg_price * existing.quantity + price * qty) / totalQty
-        );
-        await supabase
-          .from("positions")
-          .update({ quantity: totalQty, avg_price: newAvg })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("positions").insert({
-          user_id: user.id,
-          market_id: market.id,
-          side,
-          quantity: qty,
-          avg_price: price,
-        });
-      }
-
-      toast.success(
-        `Ordem executada! Comprou ${fmt(qty)} contratos de "${side === "yes" ? "Sim" : "Não"}" por R$ ${fmt(fees.totalCost)}.`
-      );
-      onClose();
+      // Redirect to Stripe Checkout (PIX)
+      window.location.assign(data.url);
     } catch (err: any) {
-      console.error("Order error:", err);
-      toast.error("Erro ao executar ordem. Tente novamente.");
+      console.error("Checkout error:", err);
+      toast.error("Erro ao criar sessão de pagamento. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -255,9 +195,9 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             variant={side === "yes" ? "success" : "danger"}
             className="w-full h-12 text-base font-bold"
             onClick={handleOrder}
-            disabled={!!insufficientBalance || invalidQty}
+            disabled={loading || invalidQty}
           >
-            Comprar {side === "yes" ? "Sim" : "Não"} — R$ {fmt(fees.totalCost)}
+            {loading ? "Redirecionando..." : `Comprar ${side === "yes" ? "Sim" : "Não"} — R$ ${fmt(fees.totalCost)}`}
           </Button>
 
           {/* Rules */}
