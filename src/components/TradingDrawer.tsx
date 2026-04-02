@@ -46,7 +46,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const invalidQty = qty < 0.1;
   const catLabel = categoryLabels[market.category] || market.category;
 
-  const [loading, setLoading] = useState(false);
+
 
   const handleOrder = async () => {
     if (invalidQty) {
