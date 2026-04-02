@@ -14,6 +14,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useState(() => new URLSearchParams(window.location.search));
+  const redirectTo = searchParams.get("redirect") || "/";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ export default function Login() {
       toast.error(error.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : error.message);
     } else {
       toast.success("Login realizado com sucesso!");
-      navigate("/");
+      navigate(redirectTo);
     }
   };
 

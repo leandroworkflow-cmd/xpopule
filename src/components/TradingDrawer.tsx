@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DBMarket, categoryLabels } from "@/types/market";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const PAYOUT = 100;
 const FEE_RATE = 0.01;
@@ -33,6 +35,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [quantity, setQuantity] = useState("1");
   const { balance, user } = useAuth();
+  const navigate = useNavigate();
 
   if (!market) return null;
 
@@ -43,23 +46,97 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const invalidQty = qty < 0.1;
   const catLabel = categoryLabels[market.category] || market.category;
 
-  const handleOrder = () => {
+  const handleOrder = async () => {
     if (invalidQty) {
       toast.error("Quantidade mínima: 0.1 contrato.");
       return;
     }
     if (!user) {
-      toast.error("Faça login para negociar.");
+      toast.info("Faça login para negociar.");
+      onClose();
+      navigate(`/login?redirect=${encodeURIComponent(`/mercado/${market.id}`)}`);
       return;
     }
     if (insufficientBalance) {
       toast.error("Saldo insuficiente. Deposite via PIX para continuar.");
       return;
     }
-    toast.success(
-      `Ordem executada! Comprou ${fmt(qty)} contratos de "${side === "yes" ? "Sim" : "Não"}" por R$ ${fmt(fees.totalCost)}.`
-    );
-    onClose();
+
+    try {
+      // Debit balance
+      const newBalance = balance - fees.totalCost;
+      const { error: balanceError } = await supabase
+        .from("profiles")
+        .update({ balance: newBalance })
+        .eq("id", user.id);
+      if (balanceError) throw balanceError;
+
+      // Record transaction
+      const { error: txError } = await supabase.from("transactions").insert({
+        user_id: user.id,
+        type: "buy",
+        amount: -fees.totalCost,
+        market_id: market.id,
+        side,
+        quantity: qty,
+        price_per_contract: price,
+        description: `Compra ${fmt(qty)}x ${side === "yes" ? "Sim" : "Não"} — ${market.title}`,
+      });
+      if (txError) throw txError;
+
+      // Record platform fee
+      const lastTx = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastTx.data) {
+        await supabase.from("platform_fees").insert({
+          transaction_id: lastTx.data.id,
+          amount: fees.fee,
+          fee_type: "trading",
+        });
+      }
+
+      // Upsert position
+      const { data: existing } = await supabase
+        .from("positions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("market_id", market.id)
+        .eq("side", side)
+        .maybeSingle();
+
+      if (existing) {
+        const totalQty = existing.quantity + qty;
+        const newAvg = Math.round(
+          (existing.avg_price * existing.quantity + price * qty) / totalQty
+        );
+        await supabase
+          .from("positions")
+          .update({ quantity: totalQty, avg_price: newAvg })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("positions").insert({
+          user_id: user.id,
+          market_id: market.id,
+          side,
+          quantity: qty,
+          avg_price: price,
+        });
+      }
+
+      toast.success(
+        `Ordem executada! Comprou ${fmt(qty)} contratos de "${side === "yes" ? "Sim" : "Não"}" por R$ ${fmt(fees.totalCost)}.`
+      );
+      onClose();
+    } catch (err: any) {
+      console.error("Order error:", err);
+      toast.error("Erro ao executar ordem. Tente novamente.");
+    }
   };
 
   return (
