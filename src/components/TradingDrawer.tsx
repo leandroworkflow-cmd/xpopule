@@ -12,18 +12,30 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PAYOUT = 100;
 const FEE_RATE = 0.01;
-const QUICK_QUANTITIES = [1, 5, 10];
+const QUICK_AMOUNTS = [10, 50, 100];
+const MIN_AMOUNT = 1;
 
-function calcFees(qty: number, pricePerContract: number) {
-  const subtotal = qty * pricePerContract;
-  const fee = subtotal * FEE_RATE;
-  const totalCost = subtotal + fee;
+function calcFromAmount(amount: number, pricePerContract: number) {
+  const qty = amount / pricePerContract;
+  const fee = amount * FEE_RATE;
+  const totalCost = amount + fee;
   const potentialReturn = qty * PAYOUT;
   const netProfit = potentialReturn - totalCost;
-  return { subtotal, fee, totalCost, potentialReturn, netProfit };
+  return { qty, subtotal: amount, fee, totalCost, potentialReturn, netProfit };
 }
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function formatCurrency(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  const num = parseInt(digits || "0", 10) / 100;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function parseCurrency(formatted: string): number {
+  const clean = formatted.replace(/\./g, "").replace(",", ".");
+  return parseFloat(clean) || 0;
+}
 
 interface TradingDrawerProps {
   market: DBMarket | null;
@@ -33,22 +45,31 @@ interface TradingDrawerProps {
 
 export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
-  const [quantity, setQuantity] = useState("1");
+  const [amountDisplay, setAmountDisplay] = useState("1,00");
   const [loading, setLoading] = useState(false);
   const { balance, user, refreshBalance } = useAuth();
   const navigate = useNavigate();
 
   if (!market) return null;
   const price = side === "yes" ? market.yes_price : market.no_price;
-  const qty = parseFloat(quantity) || 0;
-  const fees = calcFees(qty, price);
+  const amount = parseCurrency(amountDisplay);
+  const fees = calcFromAmount(amount, price);
   const insufficientBalance = user && fees.totalCost > balance;
-  const invalidQty = qty < 0.1;
+  const invalidAmount = amount < MIN_AMOUNT;
   const catLabel = categoryLabels[market.category] || market.category;
 
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAmountDisplay(formatCurrency(e.target.value));
+  };
+
+  const addAmount = (val: number) => {
+    const newAmount = amount + val;
+    setAmountDisplay(fmt(newAmount));
+  };
+
   const handleOrder = async () => {
-    if (invalidQty) {
-      toast.error("Quantidade mínima: 0.1 contrato.");
+    if (invalidAmount) {
+      toast.error("O valor mínimo para participar é R$ 1,00.");
       return;
     }
 
@@ -78,9 +99,9 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           amount: -fees.totalCost,
           market_id: market.id,
           side,
-          quantity: qty,
+          quantity: fees.qty,
           price_per_contract: price,
-          description: `Compra ${qty}x ${side.toUpperCase()} - ${market.title}`,
+          description: `Compra ${fmt(fees.qty)}x ${side.toUpperCase()} - ${market.title}`,
         });
 
         // Record platform fee
@@ -101,9 +122,9 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           .maybeSingle();
 
         if (existing) {
-          const newQty = existing.quantity + qty;
+          const newQty = existing.quantity + fees.qty;
           const newAvg = Math.round(
-            (existing.avg_price * existing.quantity + price * qty) / newQty
+            (existing.avg_price * existing.quantity + price * fees.qty) / newQty
           );
           await supabase
             .from("positions")
@@ -114,13 +135,13 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             user_id: user.id,
             market_id: market.id,
             side,
-            quantity: qty,
+            quantity: fees.qty,
             avg_price: price,
           });
         }
 
         await refreshBalance();
-        toast.success(`Compra de ${qty}x ${side === "yes" ? "SIM" : "NÃO"} realizada!`);
+        toast.success(`Compra de ${fmt(fees.qty)}x ${side === "yes" ? "SIM" : "NÃO"} realizada!`);
         onClose();
       } catch (err: any) {
         console.error("Trade error:", err);
@@ -139,7 +160,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           amount: fees.totalCost,
           marketId: market.id,
           side,
-          quantity: qty,
+          quantity: fees.qty,
           pricePerContract: price,
         },
       });
@@ -193,43 +214,53 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             </Button>
           </div>
 
-          {/* Quick quantity buttons */}
+          {/* Quick amount buttons */}
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Quantidade Rápida</label>
+            <label className="text-sm text-muted-foreground mb-2 block">Adicionar Valor Rápido</label>
             <div className="grid grid-cols-3 gap-2">
-              {QUICK_QUANTITIES.map((q) => (
+              {QUICK_AMOUNTS.map((val) => (
                 <Button
-                  key={q}
-                  variant={parseFloat(quantity) === q ? "secondary" : "outline"}
+                  key={val}
+                  variant="outline"
                   size="sm"
-                  className="h-10 flex-col gap-0"
-                  onClick={() => setQuantity(String(q))}
+                  className="h-10 font-bold"
+                  onClick={() => addAmount(val)}
                 >
-                  <span className="font-bold">{q}x</span>
-                  <span className="text-[10px] opacity-70">R$ {fmt(q * price)}</span>
+                  + R$ {val}
                 </Button>
               ))}
             </div>
           </div>
 
-          {/* Custom quantity */}
+          {/* Amount input */}
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Quantidade Personalizada</label>
-            <Input
-              type="number"
-              min="0.1"
-              step="0.1"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="bg-background border-border text-foreground text-lg h-12"
-            />
-            <p className="text-xs text-muted-foreground mt-1">Mínimo: 0.1 contrato (R$ {fmt(price * 0.1)})</p>
+            <label className="text-sm text-muted-foreground mb-2 block">Valor do Investimento</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-lg">R$</span>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={amountDisplay}
+                onChange={handleAmountChange}
+                className="pl-11 bg-background border-border text-foreground text-lg h-12"
+              />
+            </div>
+            {invalidAmount && amount > 0 && (
+              <p className="text-xs text-destructive mt-1 font-medium">
+                O valor mínimo para participar deste mercado é R$ 1,00
+              </p>
+            )}
+            {!invalidAmount && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Você está adquirindo <span className="font-semibold text-foreground">{fmt(fees.qty)}</span> contratos de {side === "yes" ? "SIM" : "NÃO"} @ R$ {fmt(price)}
+              </p>
+            )}
           </div>
 
           {/* Fee breakdown */}
           <div className="rounded-lg bg-background/50 p-4 space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Investimento ({fmt(qty)}x R$ {fmt(price)})</span>
+              <span className="text-muted-foreground">Investimento ({fmt(fees.qty)} contratos)</span>
               <span className="text-foreground font-medium">R$ {fmt(fees.subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
@@ -272,7 +303,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             variant={side === "yes" ? "success" : "danger"}
             className="w-full h-12 text-base font-bold"
             onClick={handleOrder}
-            disabled={loading || invalidQty}
+            disabled={loading || invalidAmount}
           >
             {loading ? (
               <>
