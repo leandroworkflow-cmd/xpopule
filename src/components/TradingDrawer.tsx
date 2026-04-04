@@ -12,18 +12,30 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PAYOUT = 100;
 const FEE_RATE = 0.01;
-const QUICK_QUANTITIES = [1, 5, 10];
+const QUICK_AMOUNTS = [10, 50, 100];
+const MIN_AMOUNT = 1;
 
-function calcFees(qty: number, pricePerContract: number) {
-  const subtotal = qty * pricePerContract;
-  const fee = subtotal * FEE_RATE;
-  const totalCost = subtotal + fee;
+function calcFromAmount(amount: number, pricePerContract: number) {
+  const qty = amount / pricePerContract;
+  const fee = amount * FEE_RATE;
+  const totalCost = amount + fee;
   const potentialReturn = qty * PAYOUT;
   const netProfit = potentialReturn - totalCost;
-  return { subtotal, fee, totalCost, potentialReturn, netProfit };
+  return { qty, subtotal: amount, fee, totalCost, potentialReturn, netProfit };
 }
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function formatCurrency(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  const num = parseInt(digits || "0", 10) / 100;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function parseCurrency(formatted: string): number {
+  const clean = formatted.replace(/\./g, "").replace(",", ".");
+  return parseFloat(clean) || 0;
+}
 
 interface TradingDrawerProps {
   market: DBMarket | null;
