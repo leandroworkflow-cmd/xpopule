@@ -45,22 +45,31 @@ interface TradingDrawerProps {
 
 export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
-  const [quantity, setQuantity] = useState("1");
+  const [amountDisplay, setAmountDisplay] = useState("1,00");
   const [loading, setLoading] = useState(false);
   const { balance, user, refreshBalance } = useAuth();
   const navigate = useNavigate();
 
   if (!market) return null;
   const price = side === "yes" ? market.yes_price : market.no_price;
-  const qty = parseFloat(quantity) || 0;
-  const fees = calcFees(qty, price);
+  const amount = parseCurrency(amountDisplay);
+  const fees = calcFromAmount(amount, price);
   const insufficientBalance = user && fees.totalCost > balance;
-  const invalidQty = qty < 0.1;
+  const invalidAmount = amount < MIN_AMOUNT;
   const catLabel = categoryLabels[market.category] || market.category;
 
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAmountDisplay(formatCurrency(e.target.value));
+  };
+
+  const addAmount = (val: number) => {
+    const newAmount = amount + val;
+    setAmountDisplay(fmt(newAmount));
+  };
+
   const handleOrder = async () => {
-    if (invalidQty) {
-      toast.error("Quantidade mínima: 0.1 contrato.");
+    if (invalidAmount) {
+      toast.error("O valor mínimo para participar é R$ 1,00.");
       return;
     }
 
