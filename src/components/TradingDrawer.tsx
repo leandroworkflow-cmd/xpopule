@@ -214,37 +214,47 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             </Button>
           </div>
 
-          {/* Quick quantity buttons */}
+          {/* Quick amount buttons */}
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Quantidade Rápida</label>
+            <label className="text-sm text-muted-foreground mb-2 block">Adicionar Valor Rápido</label>
             <div className="grid grid-cols-3 gap-2">
-              {QUICK_QUANTITIES.map((q) => (
+              {QUICK_AMOUNTS.map((val) => (
                 <Button
-                  key={q}
-                  variant={parseFloat(quantity) === q ? "secondary" : "outline"}
+                  key={val}
+                  variant="outline"
                   size="sm"
-                  className="h-10 flex-col gap-0"
-                  onClick={() => setQuantity(String(q))}
+                  className="h-10 font-bold"
+                  onClick={() => addAmount(val)}
                 >
-                  <span className="font-bold">{q}x</span>
-                  <span className="text-[10px] opacity-70">R$ {fmt(q * price)}</span>
+                  + R$ {val}
                 </Button>
               ))}
             </div>
           </div>
 
-          {/* Custom quantity */}
+          {/* Amount input */}
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Quantidade Personalizada</label>
-            <Input
-              type="number"
-              min="0.1"
-              step="0.1"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="bg-background border-border text-foreground text-lg h-12"
-            />
-            <p className="text-xs text-muted-foreground mt-1">Mínimo: 0.1 contrato (R$ {fmt(price * 0.1)})</p>
+            <label className="text-sm text-muted-foreground mb-2 block">Valor do Investimento</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-lg">R$</span>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={amountDisplay}
+                onChange={handleAmountChange}
+                className="pl-11 bg-background border-border text-foreground text-lg h-12"
+              />
+            </div>
+            {invalidAmount && amount > 0 && (
+              <p className="text-xs text-destructive mt-1 font-medium">
+                O valor mínimo para participar deste mercado é R$ 1,00
+              </p>
+            )}
+            {!invalidAmount && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Você está adquirindo <span className="font-semibold text-foreground">{fmt(fees.qty)}</span> contratos de {side === "yes" ? "SIM" : "NÃO"} @ R$ {fmt(price)}
+              </p>
+            )}
           </div>
 
           {/* Fee breakdown */}
