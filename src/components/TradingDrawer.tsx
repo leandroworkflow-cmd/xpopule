@@ -160,7 +160,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           amount: fees.totalCost,
           marketId: market.id,
           side,
-          quantity: qty,
+          quantity: fees.qty,
           pricePerContract: price,
         },
       });
