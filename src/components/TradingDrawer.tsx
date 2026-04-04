@@ -99,9 +99,9 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           amount: -fees.totalCost,
           market_id: market.id,
           side,
-          quantity: qty,
+          quantity: fees.qty,
           price_per_contract: price,
-          description: `Compra ${qty}x ${side.toUpperCase()} - ${market.title}`,
+          description: `Compra ${fmt(fees.qty)}x ${side.toUpperCase()} - ${market.title}`,
         });
 
         // Record platform fee
