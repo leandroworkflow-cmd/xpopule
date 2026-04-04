@@ -303,7 +303,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             variant={side === "yes" ? "success" : "danger"}
             className="w-full h-12 text-base font-bold"
             onClick={handleOrder}
-            disabled={loading || invalidQty}
+            disabled={loading || invalidAmount}
           >
             {loading ? (
               <>
