@@ -122,9 +122,9 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           .maybeSingle();
 
         if (existing) {
-          const newQty = existing.quantity + qty;
+          const newQty = existing.quantity + fees.qty;
           const newAvg = Math.round(
-            (existing.avg_price * existing.quantity + price * qty) / newQty
+            (existing.avg_price * existing.quantity + price * fees.qty) / newQty
           );
           await supabase
             .from("positions")
@@ -135,13 +135,13 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             user_id: user.id,
             market_id: market.id,
             side,
-            quantity: qty,
+            quantity: fees.qty,
             avg_price: price,
           });
         }
 
         await refreshBalance();
-        toast.success(`Compra de ${qty}x ${side === "yes" ? "SIM" : "NÃO"} realizada!`);
+        toast.success(`Compra de ${fmt(fees.qty)}x ${side === "yes" ? "SIM" : "NÃO"} realizada!`);
         onClose();
       } catch (err: any) {
         console.error("Trade error:", err);
