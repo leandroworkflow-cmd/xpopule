@@ -260,7 +260,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           {/* Fee breakdown */}
           <div className="rounded-lg bg-background/50 p-4 space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Investimento ({fmt(qty)}x R$ {fmt(price)})</span>
+              <span className="text-muted-foreground">Investimento ({fmt(fees.qty)} contratos)</span>
               <span className="text-foreground font-medium">R$ {fmt(fees.subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
