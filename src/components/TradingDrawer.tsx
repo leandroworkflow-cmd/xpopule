@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Info, AlertTriangle } from "lucide-react";
+import { Info, AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +35,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [quantity, setQuantity] = useState("1");
   const [loading, setLoading] = useState(false);
-  const { balance, user } = useAuth();
+  const { balance, user, refreshBalance } = useAuth();
   const navigate = useNavigate();
 
   if (!market) return null;
@@ -46,13 +46,12 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const invalidQty = qty < 0.1;
   const catLabel = categoryLabels[market.category] || market.category;
 
-
-
   const handleOrder = async () => {
     if (invalidQty) {
       toast.error("Quantidade mínima: 0.1 contrato.");
       return;
     }
+
     if (!user) {
       toast.info("Faça login para negociar.");
       onClose();
@@ -60,16 +59,94 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
       return;
     }
 
+    // If user has enough balance, debit directly
+    if (balance >= fees.totalCost) {
+      setLoading(true);
+      try {
+        // Debit balance
+        const { error: balanceError } = await supabase
+          .from("profiles")
+          .update({ balance: balance - fees.totalCost })
+          .eq("id", user.id);
+
+        if (balanceError) throw balanceError;
+
+        // Record transaction
+        await supabase.from("transactions").insert({
+          user_id: user.id,
+          type: "trade",
+          amount: -fees.totalCost,
+          market_id: market.id,
+          side,
+          quantity: qty,
+          price_per_contract: price,
+          description: `Compra ${qty}x ${side.toUpperCase()} - ${market.title}`,
+        });
+
+        // Record platform fee
+        if (fees.fee > 0) {
+          await supabase.from("platform_fees").insert({
+            fee_type: "trading",
+            amount: fees.fee,
+          });
+        }
+
+        // Upsert position
+        const { data: existing } = await supabase
+          .from("positions")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("market_id", market.id)
+          .eq("side", side)
+          .maybeSingle();
+
+        if (existing) {
+          const newQty = existing.quantity + qty;
+          const newAvg = Math.round(
+            (existing.avg_price * existing.quantity + price * qty) / newQty
+          );
+          await supabase
+            .from("positions")
+            .update({ quantity: newQty, avg_price: newAvg })
+            .eq("id", existing.id);
+        } else {
+          await supabase.from("positions").insert({
+            user_id: user.id,
+            market_id: market.id,
+            side,
+            quantity: qty,
+            avg_price: price,
+          });
+        }
+
+        await refreshBalance();
+        toast.success(`Compra de ${qty}x ${side === "yes" ? "SIM" : "NÃO"} realizada!`);
+        onClose();
+      } catch (err: any) {
+        console.error("Trade error:", err);
+        toast.error("Erro ao executar a ordem. Tente novamente.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Insufficient balance → redirect to Stripe PIX checkout
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { amount: fees.totalCost },
+        body: {
+          amount: fees.totalCost,
+          marketId: market.id,
+          side,
+          quantity: qty,
+          pricePerContract: price,
+        },
       });
 
       if (error) throw error;
       if (!data?.url) throw new Error("URL de pagamento não retornada.");
 
-      // Redirect to Stripe Checkout (PIX)
       window.location.assign(data.url);
     } catch (err: any) {
       console.error("Checkout error:", err);
@@ -180,12 +257,12 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             </p>
           </div>
 
-          {/* Insufficient balance warning */}
+          {/* Insufficient balance info */}
           {insufficientBalance && (
-            <div className="rounded-lg border border-danger/50 bg-danger/10 p-3 flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-danger mt-0.5 shrink-0" />
-              <p className="text-sm text-danger">
-                Saldo insuficiente. Deposite via PIX para continuar.
+            <div className="rounded-lg border border-warning/50 bg-warning/10 p-3 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+              <p className="text-sm text-warning">
+                Saldo insuficiente (R$ {fmt(balance)}). Ao confirmar, você será redirecionado para pagamento via PIX.
               </p>
             </div>
           )}
@@ -197,7 +274,16 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             onClick={handleOrder}
             disabled={loading || invalidQty}
           >
-            {loading ? "Redirecionando..." : `Comprar ${side === "yes" ? "Sim" : "Não"} — R$ ${fmt(fees.totalCost)}`}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                {insufficientBalance ? "Redirecionando para pagamento..." : "Processando..."}
+              </>
+            ) : insufficientBalance ? (
+              `Pagar via PIX — R$ ${fmt(fees.totalCost)}`
+            ) : (
+              `Comprar ${side === "yes" ? "Sim" : "Não"} — R$ ${fmt(fees.totalCost)}`
+            )}
           </Button>
 
           {/* Rules */}
