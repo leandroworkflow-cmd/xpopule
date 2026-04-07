@@ -54,7 +54,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const price = side === "yes" ? market.yes_price : market.no_price;
   const amount = parseCurrency(amountDisplay);
   const fees = calcFromAmount(amount, price);
-  const insufficientBalance = user && fees.totalCost > balance;
+  const invalidAmount = amount < MIN_AMOUNT;
   const invalidAmount = amount < MIN_AMOUNT;
   const catLabel = categoryLabels[market.category] || market.category;
 
