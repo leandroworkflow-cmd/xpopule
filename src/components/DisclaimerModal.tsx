@@ -28,7 +28,7 @@ export function DisclaimerModal() {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
-        className="sm:max-w-md [&>button]:hidden"
+        className="sm:max-w-md [&>button.absolute]:hidden"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -42,12 +42,12 @@ export function DisclaimerModal() {
               O Mercado X é um marketplace de previsões e contratos de eventos. Não somos uma casa de apostas tradicional.
             </span>
             <span className="block font-semibold text-foreground">
-              Este site é destinado exclusivamente para maiores de 21 anos.
+              Este site é destinado exclusivamente para maiores de 18 anos.
             </span>
           </DialogDescription>
         </DialogHeader>
-        <Button size="lg" className="w-full mt-2" onClick={handleAccept}>
-          Tenho mais de 21 anos e desejo continuar
+        <Button size="lg" className="w-full mt-2 relative z-10" onClick={handleAccept}>
+          Tenho mais de 18 anos e desejo continuar
         </Button>
       </DialogContent>
     </Dialog>
