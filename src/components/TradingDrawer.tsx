@@ -80,79 +80,6 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
       return;
     }
 
-    // If user has enough balance, debit directly
-    if (balance >= fees.totalCost) {
-      setLoading(true);
-      try {
-        // Debit balance
-        const { error: balanceError } = await supabase
-          .from("profiles")
-          .update({ balance: balance - fees.totalCost })
-          .eq("id", user.id);
-
-        if (balanceError) throw balanceError;
-
-        // Record transaction
-        await supabase.from("transactions").insert({
-          user_id: user.id,
-          type: "trade",
-          amount: -fees.totalCost,
-          market_id: market.id,
-          side,
-          quantity: fees.qty,
-          price_per_contract: price,
-          description: `Compra ${fmt(fees.qty)}x ${side.toUpperCase()} - ${market.title}`,
-        });
-
-        // Record platform fee
-        if (fees.fee > 0) {
-          await supabase.from("platform_fees").insert({
-            fee_type: "trading",
-            amount: fees.fee,
-          });
-        }
-
-        // Upsert position
-        const { data: existing } = await supabase
-          .from("positions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("market_id", market.id)
-          .eq("side", side)
-          .maybeSingle();
-
-        if (existing) {
-          const newQty = existing.quantity + fees.qty;
-          const newAvg = Math.round(
-            (existing.avg_price * existing.quantity + price * fees.qty) / newQty
-          );
-          await supabase
-            .from("positions")
-            .update({ quantity: newQty, avg_price: newAvg })
-            .eq("id", existing.id);
-        } else {
-          await supabase.from("positions").insert({
-            user_id: user.id,
-            market_id: market.id,
-            side,
-            quantity: fees.qty,
-            avg_price: price,
-          });
-        }
-
-        await refreshBalance();
-        toast.success(`Compra de ${fmt(fees.qty)}x ${side === "yes" ? "SIM" : "NÃO"} realizada!`);
-        onClose();
-      } catch (err: any) {
-        console.error("Trade error:", err);
-        toast.error("Erro ao executar a ordem. Tente novamente.");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Insufficient balance → redirect to Stripe PIX checkout
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
@@ -172,7 +99,6 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
     } catch (err: any) {
       console.error("Checkout error:", err);
       toast.error("Erro ao criar sessão de pagamento. Tente novamente.");
-    } finally {
       setLoading(false);
     }
   };
