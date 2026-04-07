@@ -90,7 +90,7 @@ serve(async (req) => {
     const expiresAt = Math.floor(Date.now() / 1000) + 30 * 60;
 
     const sessionConfig: any = {
-      payment_method_types: ["pix", "card"],
+      payment_method_types: ["card"],
       mode: "payment",
       client_reference_id: user.id,
       customer_email: user.email,
