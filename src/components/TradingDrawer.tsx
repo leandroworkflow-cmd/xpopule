@@ -214,15 +214,8 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             </p>
           </div>
 
-          {/* Insufficient balance info */}
-          {insufficientBalance && (
-            <div className="rounded-lg border border-warning/50 bg-warning/10 p-3 flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-              <p className="text-sm text-warning">
-                Saldo insuficiente (R$ {fmt(balance)}). Ao confirmar, você será redirecionado para pagamento via PIX.
-              </p>
-            </div>
-          )}
+
+
 
           {/* Order button */}
           <Button
