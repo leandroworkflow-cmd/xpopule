@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { Wallet, LogIn, LogOut, Shield, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DisclaimerModal } from "@/components/DisclaimerModal";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, balance, isAdmin, signOut, loading } = useAuth();
