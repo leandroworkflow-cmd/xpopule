@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Info, AlertTriangle, Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,7 +54,6 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const price = side === "yes" ? market.yes_price : market.no_price;
   const amount = parseCurrency(amountDisplay);
   const fees = calcFromAmount(amount, price);
-  const insufficientBalance = user && fees.totalCost > balance;
   const invalidAmount = amount < MIN_AMOUNT;
   const catLabel = categoryLabels[market.category] || market.category;
 
@@ -80,79 +79,6 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
       return;
     }
 
-    // If user has enough balance, debit directly
-    if (balance >= fees.totalCost) {
-      setLoading(true);
-      try {
-        // Debit balance
-        const { error: balanceError } = await supabase
-          .from("profiles")
-          .update({ balance: balance - fees.totalCost })
-          .eq("id", user.id);
-
-        if (balanceError) throw balanceError;
-
-        // Record transaction
-        await supabase.from("transactions").insert({
-          user_id: user.id,
-          type: "trade",
-          amount: -fees.totalCost,
-          market_id: market.id,
-          side,
-          quantity: fees.qty,
-          price_per_contract: price,
-          description: `Compra ${fmt(fees.qty)}x ${side.toUpperCase()} - ${market.title}`,
-        });
-
-        // Record platform fee
-        if (fees.fee > 0) {
-          await supabase.from("platform_fees").insert({
-            fee_type: "trading",
-            amount: fees.fee,
-          });
-        }
-
-        // Upsert position
-        const { data: existing } = await supabase
-          .from("positions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("market_id", market.id)
-          .eq("side", side)
-          .maybeSingle();
-
-        if (existing) {
-          const newQty = existing.quantity + fees.qty;
-          const newAvg = Math.round(
-            (existing.avg_price * existing.quantity + price * fees.qty) / newQty
-          );
-          await supabase
-            .from("positions")
-            .update({ quantity: newQty, avg_price: newAvg })
-            .eq("id", existing.id);
-        } else {
-          await supabase.from("positions").insert({
-            user_id: user.id,
-            market_id: market.id,
-            side,
-            quantity: fees.qty,
-            avg_price: price,
-          });
-        }
-
-        await refreshBalance();
-        toast.success(`Compra de ${fmt(fees.qty)}x ${side === "yes" ? "SIM" : "NÃO"} realizada!`);
-        onClose();
-      } catch (err: any) {
-        console.error("Trade error:", err);
-        toast.error("Erro ao executar a ordem. Tente novamente.");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Insufficient balance → redirect to Stripe PIX checkout
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
@@ -172,7 +98,6 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
     } catch (err: any) {
       console.error("Checkout error:", err);
       toast.error("Erro ao criar sessão de pagamento. Tente novamente.");
-    } finally {
       setLoading(false);
     }
   };
@@ -288,15 +213,8 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             </p>
           </div>
 
-          {/* Insufficient balance info */}
-          {insufficientBalance && (
-            <div className="rounded-lg border border-warning/50 bg-warning/10 p-3 flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-              <p className="text-sm text-warning">
-                Saldo insuficiente (R$ {fmt(balance)}). Ao confirmar, você será redirecionado para pagamento via PIX.
-              </p>
-            </div>
-          )}
+
+
 
           {/* Order button */}
           <Button
@@ -308,10 +226,8 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             {loading ? (
               <>
                 <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                {insufficientBalance ? "Redirecionando para pagamento..." : "Processando..."}
+                Gerando Pix...
               </>
-            ) : insufficientBalance ? (
-              `Pagar via PIX — R$ ${fmt(fees.totalCost)}`
             ) : (
               `Comprar ${side === "yes" ? "Sim" : "Não"} — R$ ${fmt(fees.totalCost)}`
             )}
