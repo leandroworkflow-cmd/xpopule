@@ -55,7 +55,6 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
   const amount = parseCurrency(amountDisplay);
   const fees = calcFromAmount(amount, price);
   const invalidAmount = amount < MIN_AMOUNT;
-  const invalidAmount = amount < MIN_AMOUNT;
   const catLabel = categoryLabels[market.category] || market.category;
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
