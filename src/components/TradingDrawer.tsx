@@ -234,10 +234,8 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
             {loading ? (
               <>
                 <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                {insufficientBalance ? "Redirecionando para pagamento..." : "Processando..."}
+                Gerando Pix...
               </>
-            ) : insufficientBalance ? (
-              `Pagar via PIX — R$ ${fmt(fees.totalCost)}`
             ) : (
               `Comprar ${side === "yes" ? "Sim" : "Não"} — R$ ${fmt(fees.totalCost)}`
             )}
