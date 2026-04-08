@@ -203,7 +203,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Lucro Líquido Estimado</span>
-                <span className={`font-bold ${fees.netProfit >= 0 ? "text-success" : "text-danger"}`}>
+                <span className={`font-bold text-lg ${fees.netProfit >= 0 ? "text-success animate-value-glow" : "text-danger"}`}>
                   R$ {fmt(fees.netProfit)}
                 </span>
               </div>
