@@ -43,7 +43,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         {market.volume > 0 && (
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <TrendingUp className="h-3 w-3" />
-            {market.volume} negociados
+            {market.volume} contratos negociados nas últimas 24h
           </span>
         )}
       </div>
