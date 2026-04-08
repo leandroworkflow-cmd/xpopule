@@ -6,6 +6,7 @@ import { Wallet, LogIn, LogOut, Shield, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
+import { Footer } from "@/components/Footer";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, balance, isAdmin, signOut, loading } = useAuth();
@@ -66,6 +67,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-4 md:p-6 overflow-auto">
             {children}
           </main>
+          <Footer />
         </div>
       </div>
     </SidebarProvider>

@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PAYOUT = 100;
 const FEE_RATE = 0.01;
-const QUICK_AMOUNTS = [10, 50, 100];
+const QUICK_AMOUNTS = [5, 10, 50, 100];
 const MIN_AMOUNT = 1;
 
 function calcFromAmount(amount: number, pricePerContract: number) {
@@ -142,7 +142,7 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
           {/* Quick amount buttons */}
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Adicionar Valor Rápido</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {QUICK_AMOUNTS.map((val) => (
                 <Button
                   key={val}
@@ -154,6 +154,14 @@ export function TradingDrawer({ market, open, onClose }: TradingDrawerProps) {
                   + R$ {val}
                 </Button>
               ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 font-bold text-primary border-primary/30"
+                onClick={() => setAmountDisplay(fmt(balance))}
+              >
+                MAX
+              </Button>
             </div>
           </div>
 
