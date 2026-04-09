@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UserBadges } from "@/components/UserBadges";
 
 const Portfolio = () => {
   const { user, balance } = useAuth();
@@ -16,6 +17,20 @@ const Portfolio = () => {
         .eq("user_id", user!.id);
       if (error) throw error;
       return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: tradeCount = 0 } = useQuery({
+    queryKey: ["trade-count", user?.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("transactions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user!.id)
+        .eq("type", "trade");
+      if (error) throw error;
+      return count || 0;
     },
     enabled: !!user,
   });
@@ -56,6 +71,10 @@ const Portfolio = () => {
             {totalPnl >= 0 ? "+" : ""}R$ {totalPnl.toFixed(2)}
           </div>
         </div>
+      </div>
+
+      <div className="mb-8">
+        <UserBadges tradeCount={tradeCount} />
       </div>
 
       {isLoading ? (
