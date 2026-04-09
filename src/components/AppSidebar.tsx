@@ -40,6 +40,7 @@ export function AppSidebar() {
 
   const pages = [
     { title: "Portfólio", url: "/portfolio", icon: Briefcase },
+    { title: "Ranking", url: "/ranking", icon: Trophy },
     { title: "Carteira", url: "/carteira", icon: Wallet },
     ...(isAdmin ? [
       { title: "Admin", url: "/admin", icon: Shield },
