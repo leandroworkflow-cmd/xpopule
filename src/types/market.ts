@@ -1,3 +1,5 @@
+import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy } from "lucide-react";
+
 export interface DBMarket {
   id: string;
   external_id: string | null;
@@ -29,4 +31,12 @@ export const categoryColors: Record<string, string> = {
   entretenimento: "bg-purple-500/15 text-purple-400 border-purple-500/30",
   clima: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   esportes: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+};
+
+export const categoryIcons: Record<string, typeof TrendingUp> = {
+  economia: TrendingUp,
+  politica: Landmark,
+  entretenimento: Clapperboard,
+  clima: CloudSun,
+  esportes: Trophy,
 };
