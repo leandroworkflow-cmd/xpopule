@@ -1,4 +1,4 @@
-import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase, Shield, DollarSign } from "lucide-react";
+import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase, Shield, DollarSign, Radio } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,7 @@ import {
 
 const categories = [
   { title: "Todos", url: "/", icon: LayoutGrid },
+  { title: "Ao Vivo", url: "/ao-vivo", icon: Radio },
   { title: "Economia", url: "/?cat=economia", icon: TrendingUp },
   { title: "Política", url: "/?cat=politica", icon: Landmark },
   { title: "Entretenimento", url: "/?cat=entretenimento", icon: Clapperboard },

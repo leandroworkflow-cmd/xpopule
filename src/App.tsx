@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import MarketDetail from "./pages/MarketDetail";
 import FAQ from "./pages/FAQ";
 import Leaderboard from "./pages/Leaderboard";
+import AoVivo from "./pages/AoVivo";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
             <Route path="/admin/financeiro" element={<AppLayout><AdminFinanceiro /></AppLayout>} />
             <Route path="/faq" element={<AppLayout><FAQ /></AppLayout>} />
             <Route path="/ranking" element={<AppLayout><Leaderboard /></AppLayout>} />
+            <Route path="/ao-vivo" element={<AppLayout><AoVivo /></AppLayout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
