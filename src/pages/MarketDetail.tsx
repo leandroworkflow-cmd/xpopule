@@ -66,6 +66,26 @@ const MarketDetail = () => {
             )}
           </div>
 
+          {(() => {
+            const teams = extractTeamsFromTitle(market.title);
+            if (teams) {
+              return (
+                <div className="flex items-center justify-center gap-6 py-4 mb-4 rounded-xl border border-border bg-card/50">
+                  <div className="flex flex-col items-center gap-2">
+                    <img src={teams.teamA.logo} alt={teams.teamA.name} className="h-16 w-16 object-contain" />
+                    <span className="text-sm font-bold text-foreground capitalize">{teams.teamA.name}</span>
+                  </div>
+                  <span className="text-lg font-black text-muted-foreground">VS</span>
+                  <div className="flex flex-col items-center gap-2">
+                    <img src={teams.teamB.logo} alt={teams.teamB.name} className="h-16 w-16 object-contain" />
+                    <span className="text-sm font-bold text-foreground capitalize">{teams.teamB.name}</span>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           <h1 className="text-2xl font-bold text-foreground mb-2 capitalize">{market.title}</h1>
 
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
@@ -73,7 +93,7 @@ const MarketDetail = () => {
             Encerra em: {endDate}
           </div>
 
-          {market.image_url && (
+          {market.image_url && !extractTeamsFromTitle(market.title) && (
             <div className="h-48 rounded-xl overflow-hidden mb-6 bg-background/50">
               <img src={market.image_url} alt={market.title} className="h-full w-full object-cover" />
             </div>
