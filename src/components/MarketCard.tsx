@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { DBMarket, categoryLabels, categoryColors, categoryIcons } from "@/types/market";
 import { Calendar, TrendingUp } from "lucide-react";
+import { extractTeamsFromTitle } from "@/lib/teamLogos";
 
 interface MarketCardProps {
   market: DBMarket;
@@ -20,12 +21,14 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
   const yesMultiplier = market.yes_price > 0 ? (100 / market.yes_price).toFixed(1) : "—";
   const noMultiplier = market.no_price > 0 ? (100 / market.no_price).toFixed(1) : "—";
 
+  const teams = extractTeamsFromTitle(market.title);
+
   return (
     <div
       onClick={() => navigate(`/mercado/${market.id}`)}
       className="rounded-xl border border-border/60 bg-card hover:border-primary/40 transition-all cursor-pointer group flex flex-col"
     >
-      {/* Header: category + subcategory */}
+      {/* Header: category */}
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${catColor}`}>
           <CatIcon className="h-3 w-3" />
@@ -36,32 +39,64 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         )}
       </div>
 
-      {/* Title */}
-      <h3 className="font-semibold text-sm text-foreground px-4 pb-3 leading-snug line-clamp-2 group-hover:text-primary transition-colors capitalize flex-1">
-        {market.title}
-      </h3>
-
-      {/* Image (optional, compact) */}
-      {market.image_url && (
-        <div className="h-28 mx-4 rounded-lg overflow-hidden mb-3 bg-background/50">
-          <img
-            src={market.image_url}
-            alt={market.title}
-            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
+      {/* Teams vs display */}
+      {teams ? (
+        <div className="flex items-center justify-center gap-3 px-4 py-3">
+          <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+            <img
+              src={teams.teamA.logo}
+              alt={teams.teamA.name}
+              className="h-10 w-10 object-contain"
+              loading="lazy"
+            />
+            <span className="text-[11px] font-semibold text-foreground text-center truncate w-full capitalize">
+              {teams.teamA.name}
+            </span>
+          </div>
+          <span className="text-xs font-bold text-muted-foreground">VS</span>
+          <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+            <img
+              src={teams.teamB.logo}
+              alt={teams.teamB.name}
+              className="h-10 w-10 object-contain"
+              loading="lazy"
+            />
+            <span className="text-[11px] font-semibold text-foreground text-center truncate w-full capitalize">
+              {teams.teamB.name}
+            </span>
+          </div>
         </div>
+      ) : (
+        <>
+          {/* Title for non-match markets */}
+          <h3 className="font-semibold text-sm text-foreground px-4 pb-3 leading-snug line-clamp-2 group-hover:text-primary transition-colors capitalize flex-1">
+            {market.title}
+          </h3>
+          {market.image_url && (
+            <div className="h-28 mx-4 rounded-lg overflow-hidden mb-3 bg-background/50">
+              <img
+                src={market.image_url}
+                alt={market.title}
+                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Title below teams (for match markets) */}
+      {teams && (
+        <h3 className="font-semibold text-xs text-muted-foreground px-4 pb-2 leading-snug line-clamp-1 text-center capitalize">
+          {market.title}
+        </h3>
       )}
 
       {/* Options - Kalshi style */}
       <div className="px-4 pb-3 space-y-2">
-        {/* YES option */}
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center gap-2">
-            <div
-              className="h-1.5 rounded-full bg-success/40"
-              style={{ width: `${Math.max(yesPct, 8)}%` }}
-            />
+            <div className="h-1.5 rounded-full bg-success/40" style={{ width: `${Math.max(yesPct, 8)}%` }} />
             <span className="text-xs text-muted-foreground whitespace-nowrap">Sim</span>
           </div>
           <span className="text-[10px] text-muted-foreground">{yesMultiplier}x</span>
@@ -72,14 +107,9 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
             {yesPct}%
           </button>
         </div>
-
-        {/* NO option */}
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center gap-2">
-            <div
-              className="h-1.5 rounded-full bg-danger/40"
-              style={{ width: `${Math.max(noPct, 8)}%` }}
-            />
+            <div className="h-1.5 rounded-full bg-danger/40" style={{ width: `${Math.max(noPct, 8)}%` }} />
             <span className="text-xs text-muted-foreground whitespace-nowrap">Não</span>
           </div>
           <span className="text-[10px] text-muted-foreground">{noMultiplier}x</span>
@@ -92,7 +122,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         </div>
       </div>
 
-      {/* Footer: volume + deadline */}
+      {/* Footer */}
       <div className="flex items-center justify-between px-4 py-2.5 border-t border-border/40 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
           <TrendingUp className="h-3 w-3" />
