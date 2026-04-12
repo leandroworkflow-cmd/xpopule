@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft, Info, TrendingUp, BarChart3 } from "lucide-react";
 import { useState } from "react";
+import { extractTeamsFromTitle } from "@/lib/teamLogos";
 
 const MarketDetail = () => {
   const { id } = useParams<{ id: string }>();
