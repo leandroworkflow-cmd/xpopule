@@ -1,58 +1,23 @@
 import { extractTeamsFromTitle, type MatchTeams } from "@/lib/teamLogos";
 import { DBMarket } from "@/types/market";
 
-/** Short name (3-letter abbreviation) from team name */
-function toShort(name: string): string {
-  // Common abbreviations
-  const SHORTS: Record<string, string> = {
-    cruzeiro: "CRU",
-    atletico_mg: "CAM",
-    america_mg: "AME",
-    palmeiras: "PAL",
-    corinthians: "COR",
-    sao_paulo: "SAO",
-    santos: "SAN",
-    flamengo: "FLA",
-    fluminense: "FLU",
-    vasco: "VAS",
-    botafogo: "BOT",
-    gremio: "GRE",
-    internacional: "INT",
-    juventude: "JUV",
-    caxias: "CAX",
-    athletico_pr: "CAP",
-    coritiba: "CFC",
-    parana: "PRC",
-    bahia: "BAH",
-    vitoria: "VIT",
-    fortaleza: "FOR",
-    ceara: "CEA",
-    sport: "SPT",
-    nautico: "NAU",
-    goias: "GOI",
-    atletico_go: "ACG",
-    cuiaba: "CUI",
-    vila_nova: "VNO",
-    bragantino: "RBB",
-    mirassol: "MIR",
-    ponte_preta: "PON",
-    guarani: "GUA",
-    ituano: "ITU",
-    novorizontino: "NOV",
-    chapecoense: "CHA",
-    avai: "AVA",
-    figueirense: "FIG",
-    criciuma: "CRI",
-    sampaio_correa: "SAM",
-    abc: "ABC",
-    remo: "REM",
-    paysandu: "PAY",
-    brazil: "BRA",
-    argentina: "ARG",
-    france: "FRA",
-    england: "ENG",
-  };
-  return SHORTS[name] || name.slice(0, 3).toUpperCase();
+const SHORTS: Record<string, string> = {
+  cruzeiro: "CRU", atletico_mg: "CAM", america_mg: "AME", palmeiras: "PAL",
+  corinthians: "COR", sao_paulo: "SAO", santos: "SAN", flamengo: "FLA",
+  fluminense: "FLU", vasco: "VAS", botafogo: "BOT", gremio: "GRE",
+  internacional: "INT", juventude: "JUV", caxias: "CAX", athletico_pr: "CAP",
+  coritiba: "CFC", parana: "PRC", bahia: "BAH", vitoria: "VIT",
+  fortaleza: "FOR", ceara: "CEA", sport: "SPT", nautico: "NAU",
+  goias: "GOI", atletico_go: "ACG", cuiaba: "CUI", vila_nova: "VNO",
+  bragantino: "RBB", mirassol: "MIR", ponte_preta: "PON", guarani: "GUA",
+  ituano: "ITU", novorizontino: "NOV", chapecoense: "CHA", avai: "AVA",
+  figueirense: "FIG", criciuma: "CRI", sampaio_correa: "SAM", abc: "ABC",
+  remo: "REM", paysandu: "PAY", brazil: "BRA", argentina: "ARG",
+  france: "FRA", england: "ENG",
+};
+
+function toShort(key: string): string {
+  return SHORTS[key] || key.slice(0, 3).toUpperCase();
 }
 
 function getDayLabel(date: Date): string {
@@ -62,13 +27,11 @@ function getDayLabel(date: Date): string {
 
 interface MatchListProps {
   markets: DBMarket[];
-  /** Indices of markets that show "FIQUE POR DENTRO" highlight */
   highlightIndices?: number[];
   onNavigate?: (market: DBMarket) => void;
 }
 
 export function MatchList({ markets, highlightIndices = [], onNavigate }: MatchListProps) {
-  // Filter only markets that have two teams
   const matchMarkets = markets
     .map((m) => ({ market: m, teams: extractTeamsFromTitle(m.title) }))
     .filter((x): x is { market: DBMarket; teams: MatchTeams } => x.teams !== null);
@@ -76,64 +39,70 @@ export function MatchList({ markets, highlightIndices = [], onNavigate }: MatchL
   if (matchMarkets.length === 0) return null;
 
   return (
-    <div className="bg-background rounded-xl border border-border/60 overflow-hidden divide-y divide-border/40">
+    <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
       {matchMarkets.map(({ market, teams }, idx) => {
         const endDate = new Date(market.end_date);
         const dateStr = endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
         const dayLabel = getDayLabel(endDate);
         const timeStr = endDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
         const showHighlight = highlightIndices.includes(idx);
+        const shortA = toShort(teams.teamA.key);
+        const shortB = toShort(teams.teamB.key);
 
         return (
           <div
             key={market.id}
             onClick={() => onNavigate?.(market)}
-            className="px-4 py-5 cursor-pointer hover:bg-muted/30 transition-colors"
+            className={`cursor-pointer hover:bg-muted/40 transition-colors ${idx > 0 ? "border-t border-border/40" : ""}`}
           >
-            {/* Stadium + Date */}
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mb-4">
-              <span className="font-medium text-foreground/80">—</span>
-              <span>{dateStr} • {dayLabel} • {timeStr}</span>
-              <span className="font-medium text-foreground/80">—</span>
+            {/* Stadium + Date row */}
+            <div className="flex items-center justify-center gap-3 pt-4 pb-2 px-4">
+              <span className="text-[13px] text-muted-foreground font-medium">
+                {dateStr} • {dayLabel} • {timeStr}
+              </span>
             </div>
 
-            {/* Teams row */}
-            <div className="flex items-center justify-center gap-6">
-              {/* Team A */}
-              <div className="flex flex-col items-center gap-1.5 min-w-[72px]">
-                <span className="text-sm font-bold text-foreground tracking-wide">
-                  {toShort(teams.teamA.key)}
+            {/* Teams confrontation — exact sport app style */}
+            <div className="flex items-center justify-center px-4 pb-4 gap-0">
+              {/* Team A: short + logo side by side */}
+              <div className="flex items-center gap-3 justify-end min-w-[120px]">
+                <span className="text-base font-extrabold text-foreground tracking-wider">
+                  {shortA}
                 </span>
                 <img
                   src={teams.teamA.logo}
                   alt={teams.teamA.name}
-                  className="h-12 w-12 object-contain"
+                  className="h-11 w-11 object-contain flex-shrink-0"
                   loading="lazy"
                 />
               </div>
 
-              {/* Separator */}
-              <span className="text-lg font-bold text-muted-foreground">x</span>
+              {/* X separator */}
+              <span className="text-sm font-bold text-muted-foreground mx-5 select-none">
+                x
+              </span>
 
-              {/* Team B */}
-              <div className="flex flex-col items-center gap-1.5 min-w-[72px]">
+              {/* Team B: logo + short side by side */}
+              <div className="flex items-center gap-3 justify-start min-w-[120px]">
                 <img
                   src={teams.teamB.logo}
                   alt={teams.teamB.name}
-                  className="h-12 w-12 object-contain"
+                  className="h-11 w-11 object-contain flex-shrink-0"
                   loading="lazy"
                 />
-                <span className="text-sm font-bold text-foreground tracking-wide">
-                  {toShort(teams.teamB.key)}
+                <span className="text-base font-extrabold text-foreground tracking-wider">
+                  {shortB}
                 </span>
               </div>
             </div>
 
             {/* Highlight badge */}
             {showHighlight && (
-              <p className="text-center text-xs font-bold text-emerald-500 mt-3 tracking-wide">
-                FIQUE POR DENTRO
-              </p>
+              <div className="pb-3 text-center">
+                <span className="text-[11px] font-bold tracking-widest text-emerald-500 uppercase">
+                  Fique por dentro
+                </span>
+              </div>
             )}
           </div>
         );
