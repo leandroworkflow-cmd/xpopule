@@ -4,6 +4,7 @@ import { useMarkets } from "@/hooks/useMarkets";
 import { DBMarket, categoryLabels, categoryColors, categoryIcons } from "@/types/market";
 import { TradingDrawer } from "@/components/TradingDrawer";
 import { MarketCardSkeleton } from "@/components/MarketCard";
+import { MatchList } from "@/components/MatchList";
 import { Radio, TrendingUp, Calendar, Clock, Flame } from "lucide-react";
 
 const AoVivo = () => {
@@ -75,9 +76,23 @@ const AoVivo = () => {
         </div>
       ) : (
         <>
+          {/* Match-style list for sport markets */}
+          {liveMarkets.filter(m => m.category === "esportes").length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                ⚽ Partidas do Dia
+              </h2>
+              <MatchList
+                markets={liveMarkets.filter(m => m.category === "esportes")}
+                highlightIndices={[2]}
+                onNavigate={(m) => navigate(`/mercado/${m.id}`)}
+              />
+            </div>
+          )}
+
           {liveMarkets.length > 0 ? (
             <div className="space-y-3 mb-10">
-              {liveMarkets.map((market) => (
+              {liveMarkets.filter(m => m.category !== "esportes").map((market) => (
                 <LiveEventCard
                   key={market.id}
                   market={market}
