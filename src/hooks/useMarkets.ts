@@ -11,14 +11,17 @@ export function useMarkets(category?: string | null) {
         .select("*")
         .eq("status", "active")
         .order("end_date", { ascending: true });
-
       if (category) {
         query = query.eq("category", category);
       }
-
       const { data, error } = await query;
       if (error) throw error;
-      return (data as unknown as DBMarket[]) ?? [];
+      // Mapeia nome -> title para compatibilidade
+      const mapped = (data || []).map((m: any) => ({
+        ...m,
+        title: m.nome || m.title || "",
+      }));
+      return mapped as unknown as DBMarket[];
     },
   });
 }
@@ -33,7 +36,7 @@ export function useMarket(id: string) {
         .eq("id", id)
         .single();
       if (error) throw error;
-      return data as unknown as DBMarket;
+      return { ...data, title: (data as any).nome || (data as any).title || "" } as unknown as DBMarket;
     },
     enabled: !!id,
   });
