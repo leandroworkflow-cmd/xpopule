@@ -41,59 +41,61 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
 
       {/* Teams vs display */}
       {teams ? (
-        <div className="flex items-center justify-center gap-3 px-4 py-3">
-          <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
-            <img
-              src={teams.teamA.logo}
-              alt={teams.teamA.name}
-              className="h-10 w-10 object-contain"
-              loading="lazy"
-            />
-            <span className="text-[11px] font-semibold text-foreground text-center truncate w-full capitalize">
-              {teams.teamA.name}
-            </span>
-          </div>
-          <span className="text-xs font-bold text-muted-foreground">VS</span>
-          <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
-            <img
-              src={teams.teamB.logo}
-              alt={teams.teamB.name}
-              className="h-10 w-10 object-contain"
-              loading="lazy"
-            />
-            <span className="text-[11px] font-semibold text-foreground text-center truncate w-full capitalize">
-              {teams.teamB.name}
-            </span>
-          </div>
-        </div>
-      ) : (
         <>
-          {/* Title for non-match markets */}
-          <h3 className="font-semibold text-sm text-foreground px-4 pb-3 leading-snug line-clamp-2 group-hover:text-primary transition-colors capitalize flex-1">
+          <h3 className="font-semibold text-xs text-foreground px-4 pb-2 leading-snug line-clamp-2 text-center capitalize">
             {market.title}
           </h3>
+          <div className="flex items-center justify-center gap-3 px-4 py-3">
+            <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+              <img
+                src={teams.teamA.logo}
+                alt={teams.teamA.name}
+                className="h-12 w-12 object-contain"
+                loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/53/53283.png"; }}
+              />
+              <span className="text-[11px] font-semibold text-foreground text-center truncate w-full capitalize">
+                {teams.teamA.name}
+              </span>
+            </div>
+            <span className="text-sm font-bold text-muted-foreground">VS</span>
+            <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+              <img
+                src={teams.teamB.logo}
+                alt={teams.teamB.name}
+                className="h-12 w-12 object-contain"
+                loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/53/53283.png"; }}
+              />
+              <span className="text-[11px] font-semibold text-foreground text-center truncate w-full capitalize">
+                {teams.teamB.name}
+              </span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Título sempre visível antes da imagem */}
+          <h3 className="font-semibold text-sm text-foreground px-4 pb-2 leading-snug line-clamp-3 group-hover:text-primary transition-colors capitalize flex-1">
+            {market.title}
+          </h3>
+          {/* Imagem menor para não esconder o texto */}
           {market.image_url && (
-            <div className="h-28 mx-4 rounded-lg overflow-hidden mb-3 bg-background/50">
+            <div className="h-16 mx-4 rounded-lg overflow-hidden mb-3 bg-background/50">
               <img
                 src={market.image_url}
                 alt={market.title}
                 className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             </div>
           )}
         </>
       )}
 
-      {/* Title below teams (for match markets) */}
-      {teams && (
-        <h3 className="font-semibold text-xs text-muted-foreground px-4 pb-2 leading-snug line-clamp-1 text-center capitalize">
-          {market.title}
-        </h3>
-      )}
-
       {/* Options - Kalshi style */}
-      <div className="px-4 pb-3 space-y-2">
+      <div className="px-4 pb-3 space-y-2 mt-auto">
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center gap-2">
             <div className="h-1.5 rounded-full bg-success/40" style={{ width: `${Math.max(yesPct, 8)}%` }} />
