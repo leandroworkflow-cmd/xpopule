@@ -110,9 +110,19 @@ export function TradingDrawer({
     }
 
     setLoading(true);
+    console.log("🚀 Iniciando checkout...");
+    console.log("📦 Payload:", {
+      amount: fees.totalCost,
+      marketId: market.id,
+      posicaoId: posicaoAtual?.id,
+      tipo,
+      quantity: Math.floor(fees.qty),
+      pricePerContract,
+      userId: user.id,
+    });
+
     try {
-      // ✅ CORRIGIDO: nome da Edge Function correto (era "Criar--pagamento")
-      const { data, error } = await supabase.functions.invoke("criar-pagamento", {
+      const { data, error } = await supabase.functions.invoke("Criar--pagamento", {
         body: {
           amount: fees.totalCost,
           marketId: market.id,
@@ -124,13 +134,16 @@ export function TradingDrawer({
         },
       });
 
+      console.log("✅ Resposta da função:", data);
+      console.log("❌ Erro da função:", error);
+      console.log("🔗 init_point:", data?.init_point);
+
       if (error) throw error;
       if (!data?.init_point) throw new Error("URL de pagamento não retornada.");
 
-      // ✅ Redireciona para o Mercado Pago
       window.location.assign(data.init_point);
     } catch (err: any) {
-      console.error("Checkout error:", err);
+      console.error("💥 Checkout error:", err);
       toast.error("Erro ao criar sessão de pagamento. Tente novamente.");
       setLoading(false);
     }
