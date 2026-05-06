@@ -111,7 +111,8 @@ export function TradingDrawer({
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("Criar--pagamento", {
+      // ✅ CORRIGIDO: nome da Edge Function correto (era "Criar--pagamento")
+      const { data, error } = await supabase.functions.invoke("criar-pagamento", {
         body: {
           amount: fees.totalCost,
           marketId: market.id,
@@ -126,6 +127,7 @@ export function TradingDrawer({
       if (error) throw error;
       if (!data?.init_point) throw new Error("URL de pagamento não retornada.");
 
+      // ✅ Redireciona para o Mercado Pago
       window.location.assign(data.init_point);
     } catch (err: any) {
       console.error("Checkout error:", err);
