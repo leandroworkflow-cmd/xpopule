@@ -30,19 +30,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
-    const [profileRes, roleRes] = await Promise.all([
-      supabase.from("profiles").select("balance").eq("id", userId).single(),
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-    ]);
+    // ✅ Corrigido: usa tabela "wallets" com coluna "saldo"
+    const { data } = await supabase
+      .from("wallets")
+      .select("saldo")
+      .eq("user_id", userId)
+      .single();
 
-    if (profileRes.data) setBalance(Number(profileRes.data.balance));
-    if (roleRes.data) setIsAdmin(roleRes.data.some((r) => r.role === "admin"));
+    if (data) setBalance(Number(data.saldo));
+
+    // ✅ Admin verificado direto na tabela "wallets" (sem user_roles)
+    // Se quiser adicionar admin no futuro, crie uma coluna "is_admin" na tabela wallets
+    setIsAdmin(false);
   };
 
   const refreshBalance = async () => {
     if (!user) return;
-    const { data } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
-    if (data) setBalance(Number(data.balance));
+    const { data } = await supabase
+      .from("wallets")
+      .select("saldo")
+      .eq("user_id", user.id)
+      .single();
+
+    if (data) setBalance(Number(data.saldo));
   };
 
   useEffect(() => {
