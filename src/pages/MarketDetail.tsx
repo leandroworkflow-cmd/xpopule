@@ -155,5 +155,4 @@ ENDOFFILE
 
 cp /tmp/market.tsx src/pages/MarketDetail.tsx
 git add src/pages/MarketDetail.tsx
-git commit -m "fix: passa posicoes para TradingDrawer corretamente"
 git push
