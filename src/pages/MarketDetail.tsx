@@ -151,8 +151,3 @@ const MarketDetail = () => {
 };
 
 export default MarketDetail;
-ENDOFFILE
-
-cp /tmp/market.tsx src/pages/MarketDetail.tsx
-git add src/pages/MarketDetail.tsx
-git push
