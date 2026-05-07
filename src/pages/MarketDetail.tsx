@@ -1,4 +1,3 @@
-cat > /tmp/market.tsx << 'ENDOFFILE'
 import { useParams, useNavigate } from "react-router-dom";
 import { useMarket, useMarketPosicoes } from "@/hooks/useMarkets";
 import { categoryLabels, categoryColors, categoryIcons } from "@/types/market";
