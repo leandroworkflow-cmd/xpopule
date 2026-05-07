@@ -16,7 +16,6 @@ export function useMarkets(category?: string | null) {
       }
       const { data, error } = await query;
       if (error) throw error;
-      // Mapeia nome -> title para compatibilidade
       const mapped = (data || []).map((m: any) => ({
         ...m,
         title: m.nome || m.title || "",
@@ -39,5 +38,21 @@ export function useMarket(id: string) {
       return { ...data, title: (data as any).nome || (data as any).title || "" } as unknown as DBMarket;
     },
     enabled: !!id,
+  });
+}
+
+// ✅ NOVO: busca as posições (time_casa, empate, time_fora) de um mercado
+export function useMarketPosicoes(marketId: string) {
+  return useQuery({
+    queryKey: ["posicoes", marketId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("posicoes")
+        .select("*")
+        .eq("mercado_id", marketId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!marketId,
   });
 }

@@ -122,7 +122,8 @@ export function TradingDrawer({
     });
 
     try {
-      const { data, error } = await supabase.functions.invoke("Criar--pagamento", {
+      // ✅ CORRIGIDO: nome da edge function com um traço e minúsculo
+      const { data, error } = await supabase.functions.invoke("criar-pagamento", {
         body: {
           amount: fees.totalCost,
           marketId: market.id,
