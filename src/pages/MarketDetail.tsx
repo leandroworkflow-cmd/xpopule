@@ -15,7 +15,6 @@ const MarketDetail = () => {
   const navigate = useNavigate();
   const { data: market, isLoading } = useMarket(id || "");
   const { data: posicoes = [] } = useMarketPosicoes(id || "");
-  const { data: posicoes = [] } = useMarketPosicoes(id || "");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (isLoading) {
