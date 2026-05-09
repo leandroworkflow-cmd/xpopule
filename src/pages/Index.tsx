@@ -288,46 +288,6 @@ function FeaturedCard({
         <PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} />
       </div>
 
-      {/* ── Lista compacta (demais jogos) ── */}
-      {compact.length > 0 && (
-        <div className="border-t border-border/40 divide-y divide-border/30">
-          {compact.map((m, i) => {
-            const info  = getMarketInfo(m);
-            const trend = (m as any).price_change ?? 0;
-            return (
-              <div
-                key={m.id}
-                onClick={() => onSelect(m)}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-accent/50 cursor-pointer transition-colors group"
-              >
-                <span className="text-xs text-muted-foreground w-5 text-center shrink-0">{i + 2}</span>
-                <div className="flex items-center shrink-0">
-                  {info.homeLogo && (
-                    <img src={info.homeLogo} alt={info.labelA} className="h-5 w-5 object-contain rounded-full bg-muted"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  )}
-                  {info.awayLogo && (
-                    <img src={info.awayLogo} alt={info.labelB} className="h-5 w-5 object-contain rounded-full bg-muted -ml-1.5"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  )}
-                </div>
-                <span className="flex-1 text-sm text-foreground truncate group-hover:text-primary transition-colors">
-                  {info.title}
-                </span>
-                {trend !== 0 && (
-                  <span className={`text-xs font-medium flex items-center gap-0.5 shrink-0 ${trend > 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {Math.abs(trend)}%
-                  </span>
-                )}
-                <span className="shrink-0 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full min-w-[44px] text-center">
-                  {info.yesProb}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* ── Footer pills — sempre visível ── */}
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
