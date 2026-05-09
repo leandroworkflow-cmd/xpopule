@@ -57,11 +57,12 @@ function getMarketInfo(market: DBMarket) {
   return { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb, dateLabel };
 }
 
-function fmtVol(v: number) {
-  if (!v) return "$0";
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
-  if (v >= 1_000)     return `$${(v / 1_000).toFixed(0)}K`;
-  return `$${v}`;
+function fmtVol(v: number | null | undefined) {
+  const n = Number(v) || 0;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}K`;
+  if (n > 0)          return `$${n.toLocaleString("pt-BR")}`;
+  return "—";
 }
 
 // ─── Price History hook ────────────────────────────────────────────────────────
@@ -227,70 +228,52 @@ function FeaturedCard({
 
       {/* ── Times + probabilidades ── */}
       <div className="px-5 py-3">
-        <div className="flex items-center text-xs text-muted-foreground mb-2 justify-between">
-          <span>Mercado</span>
-          <div className="flex gap-10 mr-1">
-            <span>Paga fora</span>
-            <span>Probabilidades</span>
-          </div>
+        <div className="flex items-center text-xs text-muted-foreground mb-2">
+          <span className="flex-1">Mercado</span>
+          <span className="w-14 text-center mr-3">Paga fora</span>
+          <span className="w-16 text-center">Probabilidades</span>
         </div>
 
         {/* Time A */}
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center py-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             {homeLogo ? (
-              <img
-                src={homeLogo}
-                alt={labelA}
-                className="h-7 w-7 rounded-full object-contain bg-muted"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
+              <img src={homeLogo} alt={labelA} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
+              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
                 {labelA.slice(0, 2).toUpperCase()}
               </div>
             )}
-            <span className="text-sm font-medium text-foreground">{labelA}</span>
+            <span className="text-sm font-medium text-foreground truncate">{labelA}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">{yesOdds}x</span>
-            <button
-              onClick={() => onSelect(featured)}
-              className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
-            >
-              {yesProb}%
-            </button>
-          </div>
+          <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
+          <button onClick={() => onSelect(featured)}
+            className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
+            {yesProb}%
+          </button>
         </div>
 
         {/* Time B */}
-        <div className="flex items-center justify-between py-2 border-t border-border/30">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center py-2 border-t border-border/30">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             {awayLogo ? (
-              <img
-                src={awayLogo}
-                alt={labelB}
-                className="h-7 w-7 rounded-full object-contain bg-muted"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
+              <img src={awayLogo} alt={labelB} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
+              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
                 {labelB.slice(0, 2).toUpperCase()}
               </div>
             )}
-            <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2">
+            <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">
               {labelB}
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">{noOdds}x</span>
-            <button
-              onClick={() => onSelect(featured)}
-              className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
-            >
-              {noProb}%
-            </button>
-          </div>
+          <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
+          <button onClick={() => onSelect(featured)}
+            className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
+            {noProb}%
+          </button>
         </div>
       </div>
 
@@ -346,7 +329,7 @@ function FeaturedCard({
         </div>
       )}
 
-      {/* ── Footer pills ── */}
+      {/* ── Footer pills — sempre visível ── */}
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
