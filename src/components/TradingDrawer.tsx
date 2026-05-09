@@ -62,8 +62,9 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
   if (!market) return null;
 
   const title = (market as any).nome || (market as any).title || "";
-  const timeCasa = (market as any).time_casa || "Time A";
-  const timeFora = (market as any).time_fora || "Time B";
+  const isSport  = (market as any).category === "esportes";
+  const timeCasa = isSport ? ((market as any).time_casa || "Time A") : "Sim";
+  const timeFora = isSport ? ((market as any).time_fora || "Time B") : "Não";
   const dataEvento = (market as any).data_evento || (market as any).end_date;
   const descricao = (market as any).descricao || (market as any).resolution_rule || "";
 
@@ -119,14 +120,14 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
       <SheetContent className="w-full sm:max-w-md bg-card border-border overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-foreground text-left text-lg leading-snug capitalize">{title}</SheetTitle>
-          {dataEvento && <p className="text-xs text-muted-foreground">Evento: {new Date(dataEvento).toLocaleDateString("pt-BR")}</p>}
+          {dataEvento && !isNaN(new Date(dataEvento).getTime()) && <p className="text-xs text-muted-foreground">Evento: {new Date(dataEvento).toLocaleDateString("pt-BR")}</p>}
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Escolha sua posição</label>
             <div className="flex gap-2">
-              {(["time_casa", "empate", "time_fora"] as const).map((t) => {
+              {(isSport ? ["time_casa", "empate", "time_fora"] : ["time_casa", "time_fora"] as const).map((t) => {
                 const pos = posicoes.find((p) => p.tipo === t);
                 const isSelected = tipo === t;
                 const odd = pos?.preco_unitario > 0 ? (1 / pos.preco_unitario).toFixed(2) : "—";
@@ -148,7 +149,7 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
                 );
               })}
             </div>
-            {posicoes.length === 3 && (
+            {isSport && posicoes.length === 3 && (
               <div className="mt-3">
                 <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
                   {(["time_casa", "empate", "time_fora"] as const).map((t, i) => {
