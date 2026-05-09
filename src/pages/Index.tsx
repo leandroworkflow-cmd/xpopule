@@ -309,6 +309,110 @@ function FeaturedCard({
   );
 }
 
+
+// ─── CategoryGrid (4 cards por categoria, estilo Kalshi) ──────────────────────
+
+function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m: DBMarket) => void }) {
+  const { title, yesProb, noProb, dateLabel } = getMarketInfo(market);
+  const imageUrl = (market as any).image_url;
+  const yesOdds  = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
+  const noOdds   = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
+
+  // Pega até 2 opções do nome (dividindo por " x " ou " vs ")
+  const parts = title.split(/ x | vs /i);
+  const optA  = parts[0]?.trim().split(/[:\-–—]/)[0].trim() || "Sim";
+  const optB  = parts[1]?.trim().split(/[:\-–—]/)[0].trim() || "Não";
+  const probA = yesProb;
+  const probB = noProb;
+  const oddsA = yesOdds;
+  const oddsB = noOdds;
+
+  return (
+    <div
+      onClick={() => onSelect(market)}
+      className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3"
+    >
+      {/* Header com ícone/imagem + categoria */}
+      <div className="flex items-center gap-2">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={title}
+            className="w-8 h-8 rounded-lg object-cover bg-muted shrink-0"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <span className="text-xs font-bold text-muted-foreground">{title.slice(0, 2).toUpperCase()}</span>
+          </div>
+        )}
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+          {(market as any).category || ""}
+        </span>
+        {dateLabel && <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{dateLabel}</span>}
+      </div>
+
+      {/* Título */}
+      <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{title}</p>
+
+      {/* Opções */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-foreground truncate mr-2">{optA}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[10px] text-muted-foreground">{oddsA}x</span>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">{probA}%</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-border/30 pt-1.5">
+          <span className="text-xs text-foreground truncate mr-2 underline decoration-red-400 underline-offset-2">{optB}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[10px] text-muted-foreground">{oddsB}x</span>
+            <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-lg">{probB}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Volume */}
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-auto pt-1 border-t border-border/20">
+        <span>{fmtVol((market as any).volume)} vol</span>
+        <span className="text-primary hover:underline">Ver mercado →</span>
+      </div>
+    </div>
+  );
+}
+
+function CategoryGrid({
+  cat,
+  onSelect,
+}: {
+  cat: { key: string; label: string; icon: React.ElementType; color: string; markets: DBMarket[] };
+  onSelect: (m: DBMarket) => void;
+}) {
+  const top4 = cat.markets.slice(0, 4);
+  if (!top4.length) return null;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <cat.icon className={`h-4 w-4 ${cat.color}`} />
+          <h2 className="text-base font-bold text-foreground">{cat.label}</h2>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cat.markets.length}</span>
+        </div>
+        <span className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-0.5">
+          Ver todos <ChevronRight className="h-3 w-3" />
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {top4.map((m) => (
+          <CategoryMiniCard key={m.id} market={m} onSelect={onSelect} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Sidebar ───────────────────────────────────────────────────────────────────
 
 function Sidebar({ markets }: { markets: DBMarket[] }) {
@@ -534,21 +638,9 @@ const Index = () => {
                   </div>
                 )}
 
-                {/* Outras categorias — cada uma com seu card */}
+                {/* Outras categorias — grade 2x2 com image_url */}
                 {otherCategories.map((cat) => (
-                  <div key={cat.key}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <cat.icon className={`h-4 w-4 ${cat.color}`} />
-                        <h2 className="text-base font-bold text-foreground">{cat.label}</h2>
-                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cat.markets.length}</span>
-                      </div>
-                      <span className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-0.5">
-                        Ver todos <ChevronRight className="h-3 w-3" />
-                      </span>
-                    </div>
-                    <FeaturedCard markets={cat.markets} onSelect={setSelectedMarket} />
-                  </div>
+                  <CategoryGrid key={cat.key} cat={cat} onSelect={setSelectedMarket} />
                 ))}
               </div>
             )}
