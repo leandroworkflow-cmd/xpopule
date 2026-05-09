@@ -414,6 +414,19 @@ const Index = () => {
     return filterActive(allMarkets);
   }, [allMarkets]);
 
+  const sportsMarkets = useMemo(() =>
+    activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume),
+    [activeMarkets]);
+
+  const otherCategories = useMemo(() =>
+    CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({
+      ...cat,
+      markets: activeMarkets
+        .filter((m) => m.category === cat.key)
+        .sort((a, b) => b.volume - a.volume),
+    })).filter((c) => c.markets.length > 0),
+    [activeMarkets]);
+
   const displayMarkets = useMemo(() => {
     let base = activeMarkets;
     if (activeCategory !== "todos")
@@ -424,6 +437,8 @@ const Index = () => {
       );
     return base.sort((a, b) => b.volume - a.volume);
   }, [activeMarkets, activeCategory, search]);
+
+  const isSearching = !!search || activeCategory !== "todos";
 
   return (
     <div className="min-h-screen bg-background">
@@ -491,19 +506,51 @@ const Index = () => {
 
         {/* ── Grid principal ── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
-          {/* Card principal */}
           <div>
             {isLoading ? (
               <div className="flex flex-col gap-3">
                 {Array.from({ length: 3 }).map((_, i) => <MarketCardSkeleton key={i} />)}
               </div>
-            ) : displayMarkets.length === 0 ? (
-              <div className="text-center py-20 text-muted-foreground">
-                <Globe className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p>Nenhum mercado encontrado.</p>
-              </div>
+            ) : isSearching ? (
+              displayMarkets.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground">
+                  <Globe className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                  <p>Nenhum mercado encontrado.</p>
+                </div>
+              ) : (
+                <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
+              )
             ) : (
-              <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
+              <div className="flex flex-col gap-8">
+                {/* Esportes — card carrossel */}
+                {sportsMarkets.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Trophy className="h-4 w-4 text-orange-400" />
+                      <h2 className="text-base font-bold text-foreground">Esportiva</h2>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{sportsMarkets.length}</span>
+                    </div>
+                    <FeaturedCard markets={sportsMarkets} onSelect={setSelectedMarket} />
+                  </div>
+                )}
+
+                {/* Outras categorias — cada uma com seu card */}
+                {otherCategories.map((cat) => (
+                  <div key={cat.key}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <cat.icon className={`h-4 w-4 ${cat.color}`} />
+                        <h2 className="text-base font-bold text-foreground">{cat.label}</h2>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cat.markets.length}</span>
+                      </div>
+                      <span className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-0.5">
+                        Ver todos <ChevronRight className="h-3 w-3" />
+                      </span>
+                    </div>
+                    <FeaturedCard markets={cat.markets} onSelect={setSelectedMarket} />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
