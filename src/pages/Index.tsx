@@ -42,19 +42,21 @@ function filterActive(markets: DBMarket[]): DBMarket[] {
 }
 
 function getMarketInfo(market: DBMarket) {
-  const title   = (market as any).nome || market.title || "";
-  const teams   = extractTeamsFromTitle(title);
-  const labelA  = (market as any).time_casa || teams?.teamA?.name || "Sim";
-  const labelB  = (market as any).time_fora || teams?.teamB?.name || "Não";
-  const homeLogo = (market as any).home_logo || teams?.teamA?.logo;
-  const awayLogo = (market as any).away_logo || teams?.teamB?.logo;
+  const title    = (market as any).nome || market.title || "";
+  const category = (market as any).category || "";
+  const isSport  = category === "esportes";
+  const teams    = isSport ? extractTeamsFromTitle(title) : null;
+  const labelA   = (market as any).time_casa || (isSport ? teams?.teamA?.name : null) || "Sim";
+  const labelB   = (market as any).time_fora || (isSport ? teams?.teamB?.name : null) || "Não";
+  const homeLogo = isSport ? ((market as any).home_logo || teams?.teamA?.logo) : null;
+  const awayLogo = isSport ? ((market as any).away_logo || teams?.teamB?.logo) : null;
   const yesProb  = Math.round((market.yes_price ?? 0.5) * 100);
   const noProb   = 100 - yesProb;
   const endDate  = (market as any).end_date;
   const dateLabel = endDate
     ? new Date(endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
     : null;
-  return { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb, dateLabel };
+  return { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb, dateLabel, isSport };
 }
 
 function fmtVol(v: number | null | undefined) {
@@ -187,7 +189,6 @@ function FeaturedCard({
   const featured = markets[idx];
   const { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb, dateLabel } =
     getMarketInfo(featured);
-  const compact  = markets.filter((_, i) => i !== idx).slice(0, 6);
   const yesOdds  = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
   const noOdds   = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
 
@@ -288,8 +289,7 @@ function FeaturedCard({
         <PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} />
       </div>
 
-
-      {/* ── Footer pills — sempre visível ── */}
+      {/* ── Footer pills ── */}
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
