@@ -54,15 +54,12 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <TrendingUp className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg text-foreground tracking-tight">MercadoX</span>
+            <img src="/nefra-logo.png" alt="Nefra" className="h-10 w-auto object-contain" />
           </div>
         )}
         {collapsed && (
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-            <TrendingUp className="h-4 w-4 text-primary-foreground" />
+          <div className="h-8 w-8 rounded-lg overflow-hidden mx-auto">
+            <img src="/nefra-logo.png" alt="Nefra" className="h-full w-full object-contain" />
           </div>
         )}
       </SidebarHeader>

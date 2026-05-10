@@ -49,7 +49,7 @@ export default function Cadastro() {
           </div>
           <CardTitle className="text-foreground text-2xl">Criar Conta</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Junte-se ao MercadoX
+            Junte-se ao Nefra
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSignUp}>

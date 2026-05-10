@@ -50,7 +50,7 @@ export default function Login() {
           <div className="mx-auto h-12 w-12 rounded-xl bg-primary flex items-center justify-center mb-2">
             <TrendingUp className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-foreground text-2xl">MercadoX</CardTitle>
+          <CardTitle className="text-foreground text-2xl">Nefra</CardTitle>
           <CardDescription className="text-muted-foreground">
             {resetMode ? "Recupere sua senha" : "Entre na sua conta"}
           </CardDescription>
