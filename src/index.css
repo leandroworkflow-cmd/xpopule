@@ -1,108 +1,67 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 @layer base {
   :root {
     --background: 220 20% 7%;
     --foreground: 210 20% 92%;
-
     --card: 220 18% 10%;
     --card-foreground: 210 20% 92%;
-
     --popover: 220 18% 12%;
     --popover-foreground: 210 20% 92%;
-
-    --primary: 152 60% 48%;
+    --primary: 43 74% 55%;
     --primary-foreground: 220 20% 7%;
-
     --secondary: 220 16% 16%;
     --secondary-foreground: 210 20% 85%;
-
     --muted: 220 14% 14%;
     --muted-foreground: 215 14% 55%;
-
     --accent: 220 16% 18%;
     --accent-foreground: 210 20% 92%;
-
     --destructive: 350 65% 55%;
     --destructive-foreground: 210 40% 98%;
-
-    --success: 152 60% 48%;
+    --success: 43 74% 55%;
     --success-foreground: 220 20% 7%;
-
     --danger: 350 65% 55%;
     --danger-foreground: 210 40% 98%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 220 20% 7%;
-
     --border: 220 14% 18%;
     --input: 220 14% 18%;
-    --ring: 152 60% 48%;
-
+    --ring: 43 74% 55%;
     --radius: 0.75rem;
-
     --sidebar-background: 220 20% 5%;
     --sidebar-foreground: 210 20% 75%;
-    --sidebar-primary: 152 60% 48%;
+    --sidebar-primary: 43 74% 55%;
     --sidebar-primary-foreground: 220 20% 7%;
     --sidebar-accent: 220 16% 12%;
     --sidebar-accent-foreground: 210 20% 92%;
     --sidebar-border: 220 14% 14%;
-    --sidebar-ring: 152 60% 48%;
-
-    --chart-up: 152 60% 48%;
+    --sidebar-ring: 43 74% 55%;
+    --chart-up: 43 74% 55%;
     --chart-down: 350 65% 55%;
   }
 }
-
 @layer base {
-  * {
-    @apply border-border;
-  }
-
+  * { @apply border-border; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
   }
 }
-
 @layer utilities {
   .gradient-card {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--card) / 0.7) 0%,
-      hsl(220 18% 12% / 0.5) 100%
-    );
+    background: linear-gradient(135deg, hsl(var(--card) / 0.7) 0%, hsl(220 18% 12% / 0.5) 100%);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
-
   @keyframes value-glow {
     0%, 100% { text-shadow: 0 0 4px hsl(var(--success) / 0.3); }
     50% { text-shadow: 0 0 16px hsl(var(--success) / 0.7), 0 0 32px hsl(var(--success) / 0.3); }
   }
-
-  .animate-value-glow {
-    animation: value-glow 1.5s ease-in-out infinite;
-  }
-
-  .glow-success {
-    box-shadow: 0 0 20px -5px hsl(var(--success) / 0.3);
-  }
-
-  .glow-danger {
-    box-shadow: 0 0 20px -5px hsl(var(--danger) / 0.3);
-  }
-
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
+  .animate-value-glow { animation: value-glow 1.5s ease-in-out infinite; }
+  .glow-success { box-shadow: 0 0 20px -5px hsl(var(--success) / 0.3); }
+  .glow-danger { box-shadow: 0 0 20px -5px hsl(var(--danger) / 0.3); }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
