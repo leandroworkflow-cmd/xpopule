@@ -55,6 +55,7 @@ export function AppSidebar() {
         {!collapsed && (
           <div className="flex items-center gap-2">
             <img src="/nefra-logo.png" alt="Nefra" className="h-10 w-auto object-contain" />
+            <span className="font-bold text-lg tracking-widest" style={{color:"#C9A84C"}}>NEFRA</span>
           </div>
         )}
         {collapsed && (
