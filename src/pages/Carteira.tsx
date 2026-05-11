@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Wallet, ArrowUpRight, ArrowDownRight, Trophy, X, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; 
 import { toast } from "sonner";
 
 interface Transaction {
