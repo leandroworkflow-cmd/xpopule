@@ -12,11 +12,14 @@ serve(async (req) => {
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } });
     if (!mpRes.ok) return new Response("erro ao consultar MP", { status: 500 });
     const payment = await mpRes.json();
+    console.log("PAYMENT STATUS:", payment.status);
+    console.log("PAYMENT DATA:", JSON.stringify({ external_reference: payment.external_reference, amount: payment.transaction_amount, metadata: payment.metadata }));
     if (payment.status !== "approved") return new Response("ok", { status: 200 });
     const userId = payment.external_reference;
     const valor = payment.transaction_amount;
     const metadata = payment.metadata || {};
     const { marketId, posicaoId, tipo, quantity, pricePerContract } = metadata;
+    console.log("USER ID:", userId, "VALOR:", valor, "METADATA:", JSON.stringify(metadata));
     if (!userId || !valor) return new Response("dados incompletos", { status: 400 });
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const { data: existing } = await supabase.from("apostas").select("id").eq("mp_payment_id", String(paymentId)).maybeSingle();
@@ -29,8 +32,12 @@ serve(async (req) => {
       if (posicaoId) await supabase.rpc("incrementar_volume_comprado", { p_posicao_id: posicaoId, p_quantidade: Number(quantity) });
       return new Response("ok", { status: 200 });
     }
+    console.log("Chamando creditar_saldo para userId:", userId, "valor:", valor);
     const { error: rpcError } = await supabase.rpc("creditar_saldo", { p_user_id: userId, p_valor: valor });
-    if (rpcError) return new Response(JSON.stringify({ error: rpcError.message }), { status: 500 });
+    if (rpcError) {
+      console.log("ERRO creditar_saldo:", rpcError.message, rpcError.details, rpcError.hint);
+      return new Response(JSON.stringify({ error: rpcError.message }), { status: 500 });
+    }
     await supabase.from("transactions").insert({ user_id: userId, tipo: "deposito", valor, status: "approved", mp_payment_id: String(paymentId) });
     return new Response("ok", { status: 200 });
   } catch (err) {
