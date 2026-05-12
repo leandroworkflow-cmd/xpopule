@@ -2,20 +2,21 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Wallet, ArrowUpRight, ArrowDownRight,
+  Wallet, ArrowUpRight, ArrowDownRight, Trophy,
   X, AlertCircle, CheckCircle, Clock, ShoppingCart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Transaction {
   id: string;
-  type: string;
-  amount: number;
-  description: string | null;
+  tipo: string;
+  valor: number;
+  status: string;
+  mp_payment_id: string | null;
   created_at: string;
 }
 
@@ -35,7 +36,6 @@ interface Contrato {
   preco_pago: number;
   status: string;
   created_at: string;
-  // enriched
   tipo?: string;
   market_title?: string;
   market_category?: string;
@@ -43,10 +43,10 @@ interface Contrato {
   away_logo?: string | null;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (v: number) =>
-  v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  isNaN(v) ? "0,00" : v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString("pt-BR", {
@@ -60,13 +60,6 @@ const TIPOS_PIX = [
   { value: "aleatoria", label: "Chave aleatória" },
 ];
 
-const PIX_PLACEHOLDER: Record<string, string> = {
-  cpf:       "000.000.000-00",
-  email:     "seu@email.com",
-  celular:   "+55 11 99999-9999",
-  aleatoria: "Chave aleatória",
-};
-
 const tipoLabel: Record<string, string> = {
   time_casa: "Casa",
   empate:    "Empate",
@@ -76,9 +69,9 @@ const tipoLabel: Record<string, string> = {
 };
 
 const statusSaqueConfig: Record<string, { label: string; color: string; Icon: typeof Clock }> = {
-  pendente: { label: "Pendente", color: "text-yellow-400", Icon: Clock },
+  pendente: { label: "Pendente", color: "text-yellow-400", Icon: Clock        },
   aprovado: { label: "Aprovado", color: "text-emerald-400", Icon: CheckCircle },
-  recusado: { label: "Recusado", color: "text-red-400",    Icon: AlertCircle },
+  recusado: { label: "Recusado", color: "text-red-400",    Icon: AlertCircle  },
 };
 
 const statusContratoConfig: Record<string, { label: string; color: string }> = {
@@ -93,17 +86,20 @@ const statusContratoConfig: Record<string, { label: string; color: string }> = {
 };
 
 const txConfig: Record<string, { label: string; positive: boolean }> = {
-  deposit:    { label: "Depósito",  positive: true  },
   deposito:   { label: "Depósito",  positive: true  },
+  deposit:    { label: "Depósito",  positive: true  },
+  saque:      { label: "Saque",     positive: false },
   withdrawal: { label: "Saque",     positive: false },
+  compra:     { label: "Compra",    positive: false },
   buy:        { label: "Compra",    positive: false },
+  ganho:      { label: "Ganho",     positive: true  },
+  payout:     { label: "Ganho",     positive: true  },
   sell:       { label: "Venda",     positive: true  },
-  payout:     { label: "Pagamento", positive: true  },
 };
 
 type Tab = "contratos" | "transacoes" | "saques";
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Carteira() {
   const { user, balance } = useAuth();
@@ -141,23 +137,23 @@ export default function Carteira() {
         (pos || []).forEach((p: any) => { posicoesMap[p.id] = p; });
       }
 
-      // 2. buscar markets
+      // 2. buscar markets — usa "nome" (nome real da coluna)
       const mercadoIds = [...new Set(Object.values(posicoesMap).map((p: any) => p.mercado_id).filter(Boolean))];
       let marketsMap: Record<string, any> = {};
       if (mercadoIds.length > 0) {
-        const { data: mks } = await supabase.from("markets").select("id, title, category, home_logo, away_logo").in("id", mercadoIds);
+        const { data: mks } = await supabase.from("markets").select("id, nome, category, home_logo, away_logo").in("id", mercadoIds);
         (mks || []).forEach((m: any) => { marketsMap[m.id] = m; });
       }
 
-      // 3. enriquecer
+      // 3. enriquecer contratos
       const enriched: Contrato[] = contratosList.map(c => {
         const pos = posicoesMap[c.posicao_id];
         const mkt = pos ? marketsMap[pos.mercado_id] : null;
         return {
           ...c,
-          tipo:            pos?.tipo     ?? "—",
-          market_title:    mkt?.title    ?? "Mercado desconhecido",
-          market_category: mkt?.category ?? "",
+          tipo:            pos?.tipo      ?? "—",
+          market_title:    mkt?.nome      ?? "Mercado desconhecido",
+          market_category: mkt?.category  ?? "",
           home_logo:       mkt?.home_logo ?? null,
           away_logo:       mkt?.away_logo ?? null,
         };
@@ -172,7 +168,7 @@ export default function Carteira() {
     const valorNum = parseFloat(valor.replace(",", "."));
     if (!valorNum || valorNum < 10) { toast.error("Valor mínimo de saque é R$ 10,00"); return; }
     if (!chavePix.trim())           { toast.error("Informe sua chave Pix"); return; }
-    if (valorNum > (balance ?? 0)) { toast.error("Saldo insuficiente"); return; }
+    if (valorNum > (balance ?? 0))  { toast.error("Saldo insuficiente"); return; }
 
     setLoadingSaque(true);
     try {
@@ -185,7 +181,7 @@ export default function Carteira() {
       if (saqueError) throw new Error(saqueError.message);
 
       await supabase.from("transactions").insert({
-        user_id: user!.id, tipo: "withdrawal", valor: valorNum, status: "pending", mp_payment_id: `saque_${Date.now()}`,
+        user_id: user!.id, tipo: "saque", valor: valorNum, status: "pending", mp_payment_id: `saque_${Date.now()}`,
       });
 
       toast.success("Saque solicitado! Será processado em até 24h.");
@@ -311,9 +307,9 @@ export default function Carteira() {
           ) : (
             <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border/40">
               {transactions.map(tx => {
-                const tipo       = ((tx.type || (tx as any).tipo) ?? "deposit").toLowerCase();
+                const tipo       = (tx.tipo ?? "deposito").toLowerCase();
                 const cfg        = txConfig[tipo] ?? { label: tipo, positive: true };
-                const val        = tx.amount || (tx as any).valor || 0;
+                const val        = Number(tx.valor) || 0;
                 const isPositive = cfg.positive;
                 const Icon       = isPositive ? ArrowUpRight : ArrowDownRight;
                 return (
@@ -324,12 +320,11 @@ export default function Carteira() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-foreground">{cfg.label}</p>
-                        {tx.description && <p className="text-xs text-muted-foreground">{tx.description}</p>}
                         <p className="text-xs text-muted-foreground">{fmtDate(tx.created_at)}</p>
                       </div>
                     </div>
                     <p className={`text-sm font-bold ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-                      {isPositive ? "+" : "-"} R$ {fmt(Number(val))}
+                      {isPositive ? "+" : "-"} R$ {fmt(val)}
                     </p>
                   </div>
                 );
@@ -409,7 +404,7 @@ export default function Carteira() {
               </div>
               <div>
                 <label className="text-sm text-muted-foreground mb-1.5 block">Chave Pix</label>
-                <Input placeholder={PIX_PLACEHOLDER[tipoChave]} value={chavePix} onChange={e => setChavePix(e.target.value)} className="bg-background border-border h-11" />
+                <Input placeholder="Digite sua chave Pix" value={chavePix} onChange={e => setChavePix(e.target.value)} className="bg-background border-border h-11" />
               </div>
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex gap-2">
                 <AlertCircle className="h-4 w-4 text-yellow-400 shrink-0 mt-0.5" />
