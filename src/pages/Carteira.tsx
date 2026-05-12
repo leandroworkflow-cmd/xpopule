@@ -261,15 +261,15 @@ export default function Carteira() {
                 return (
                   <div key={c.id} className="flex items-center justify-between px-5 py-4 hover:bg-accent/20 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="relative w-9 h-9 shrink-0">
+                      <div className="relative w-12 h-12 shrink-0">
                         {c.home_logo && c.away_logo ? (
                           <>
-                            <img src={c.home_logo} alt="" className="absolute left-0 top-0 w-6 h-6 rounded-full border border-border object-cover bg-muted" />
-                            <img src={c.away_logo} alt="" className="absolute right-0 bottom-0 w-6 h-6 rounded-full border border-border object-cover bg-muted" />
+                            <img src={c.home_logo} alt="" className="absolute left-0 top-0 w-8 h-8 rounded-full border border-border object-cover bg-muted" />
+                            <img src={c.away_logo} alt="" className="absolute right-0 bottom-0 w-8 h-8 rounded-full border border-border object-cover bg-muted" />
                           </>
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-                            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
                           </div>
                         )}
                       </div>
