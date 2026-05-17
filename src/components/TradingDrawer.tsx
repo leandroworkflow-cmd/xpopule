@@ -69,13 +69,14 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
   const descricao = (market as any).descricao || (market as any).resolution_rule || "";
 
   const posicaoAtual = posicoes.find((p) => p.tipo === tipo);
-  const pricePerContract = posicaoAtual?.preco_unitario ?? 0;
-  const volDisponivel = posicaoAtual?.volume_disponivel ?? 0;
+  // Se não tem posição cadastrada, usa 0.50 como preço padrão (odd 2.0x)
+  const pricePerContract = posicaoAtual?.preco_unitario ?? 0.50;
+  // Nunca bloqueia por falta de estoque — mercado peer-to-peer sempre aberto
+  const semEstoque = false;
 
   const amount = parseCurrency(amountDisplay);
   const calc = calcPari(amount, pricePerContract);
   const invalidAmount = amount < MIN_AMOUNT;
-  const semEstoque = volDisponivel === 0;
 
   const tipoLabel = (t: string) => {
     if (t === "time_casa") return timeCasa;
@@ -93,17 +94,30 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
 
   const handleOrder = async () => {
     if (invalidAmount) { toast.error("O valor mínimo é R$ 1,00."); return; }
-    if (semEstoque) { toast.error("Sem contratos disponíveis para esta posição."); return; }
     if (!user) {
       toast.info("Faça login para negociar.");
       onClose();
       navigate(`/login?redirect=${encodeURIComponent(`/mercado/${market.id}`)}`);
       return;
     }
+    if ((balance ?? 0) < calc.totalCost) {
+      toast.error("Saldo insuficiente. Deposite para continuar.");
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("criar-pagamento", {
-        body: { amount: calc.totalCost, marketId: market.id, posicaoId: posicaoAtual?.id, tipo, quantity: calc.qty, pricePerContract, userId: user.id },
+        body: {
+          valor: calc.totalCost,
+          user_id: user.id,
+          user_email: user.email,
+          marketId: market.id,
+          tipo,
+          quantity: calc.qty,
+          pricePerContract,
+          mercado_nome: title,
+          opcao: tipoLabel(tipo),
+        },
       });
       if (error) throw error;
       if (!data?.init_point) throw new Error("URL de pagamento não retornada.");
@@ -120,52 +134,38 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
       <SheetContent className="w-full sm:max-w-md bg-card border-border overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-foreground text-left text-lg leading-snug capitalize">{title}</SheetTitle>
-          {dataEvento && !isNaN(new Date(dataEvento).getTime()) && <p className="text-xs text-muted-foreground">Evento: {new Date(dataEvento).toLocaleDateString("pt-BR")}</p>}
+          {dataEvento && !isNaN(new Date(dataEvento).getTime()) && (
+            <p className="text-xs text-muted-foreground">Evento: {new Date(dataEvento).toLocaleDateString("pt-BR")}</p>
+          )}
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          {/* Seleção de posição */}
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Escolha sua posição</label>
             <div className="flex gap-2">
               {(isSport ? ["time_casa", "empate", "time_fora"] : ["time_casa", "time_fora"] as const).map((t) => {
                 const pos = posicoes.find((p) => p.tipo === t);
                 const isSelected = tipo === t;
-                const odd = pos?.preco_unitario > 0 ? (1 / pos.preco_unitario).toFixed(2) : "—";
+                const price = pos?.preco_unitario ?? 0.50;
+                const odd = price > 0 ? (1 / price).toFixed(2) : "2.00";
                 const colorClass = t === "time_casa"
                   ? isSelected ? "bg-success/20 border-success text-success" : "border-border text-muted-foreground hover:border-success/50"
                   : t === "time_fora"
                   ? isSelected ? "bg-danger/20 border-danger text-danger" : "border-border text-muted-foreground hover:border-danger/50"
                   : isSelected ? "bg-primary/20 border-primary text-primary" : "border-border text-muted-foreground hover:border-primary/50";
                 return (
-                  <button key={t} onClick={() => setTipo(t)} className={`flex-1 flex flex-col items-center gap-0.5 py-3 px-1 rounded-lg border transition-all ${colorClass}`}>
+                  <button key={t} onClick={() => setTipo(t as any)} className={`flex-1 flex flex-col items-center gap-0.5 py-3 px-1 rounded-lg border transition-all ${colorClass}`}>
                     <span className="text-[10px] font-medium text-center leading-tight truncate w-full">{tipoLabel(t)}</span>
-                    {pos && (
-                      <>
-                        <span className="text-sm font-bold">{odd}x</span>
-                        <span className="text-[9px] opacity-70">R$ {fmt(pos.preco_unitario)}/ctr</span>
-                      </>
-                    )}
+                    <span className="text-sm font-bold">{odd}x</span>
+                    <span className="text-[9px] opacity-70">R$ {fmt(price)}/ctr</span>
                   </button>
                 );
               })}
             </div>
-            {isSport && posicoes.length === 3 && (
-              <div className="mt-3">
-                <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
-                  {(["time_casa", "empate", "time_fora"] as const).map((t, i) => {
-                    const pos = posicoes.find((p) => p.tipo === t);
-                    const pct = pos?.preco_unitario ? pos.preco_unitario * 100 : 33;
-                    const colors = ["bg-success", "bg-primary/60", "bg-danger"];
-                    return <div key={t} className={`${colors[i]} transition-all`} style={{ width: `${pct}%` }} />;
-                  })}
-                </div>
-                <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
-                  <span>{timeCasa}</span><span>Empate</span><span>{timeFora}</span>
-                </div>
-              </div>
-            )}
           </div>
 
+          {/* Valores rápidos */}
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Valor rápido</label>
             <div className="grid grid-cols-5 gap-2">
@@ -176,6 +176,7 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
             </div>
           </div>
 
+          {/* Input de valor */}
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Valor do investimento</label>
             <div className="relative">
@@ -183,15 +184,15 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
               <Input type="text" inputMode="numeric" value={amountDisplay} onChange={handleAmountChange} className="pl-11 bg-background border-border text-foreground text-lg h-12" />
             </div>
             {invalidAmount && amount > 0 && <p className="text-xs text-destructive mt-1">Valor mínimo: R$ 1,00</p>}
-            {!invalidAmount && pricePerContract > 0 && calc.qty > 0 && (
+            {!invalidAmount && calc.qty > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
-                Você está adquirindo <span className="font-semibold text-foreground">{calc.qty}</span> contrato(s) de <span className="font-semibold text-foreground">{tipoLabel(tipo)}</span> a R$ {fmt(pricePerContract)} cada
+                Você está adquirindo <span className="font-semibold text-foreground">{calc.qty}</span> contrato(s) de{" "}
+                <span className="font-semibold text-foreground">{tipoLabel(tipo)}</span> a R$ {fmt(pricePerContract)} cada
               </p>
             )}
-            {!invalidAmount && calc.qty === 0 && pricePerContract > 0 && <p className="text-xs text-destructive mt-1">Mínimo para 1 contrato: R$ {fmt(pricePerContract)}</p>}
-            {semEstoque && <p className="text-xs text-destructive mt-1">Sem contratos disponíveis para esta posição.</p>}
           </div>
 
+          {/* Resumo financeiro */}
           <div className="rounded-lg bg-background/50 border border-border/40 p-4 space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Contratos</span>
@@ -223,18 +224,25 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
                 <span className={`font-bold text-lg ${calc.netProfit >= 0 ? "text-success" : "text-danger"}`}>R$ {fmt(calc.netProfit)}</span>
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground pt-1">Cada contrato paga R$ {fmt(CONTRACT_PAYOUT)} se sua posição vencer. O lucro vem do pool das apostas perdedoras.</p>
+            <p className="text-[10px] text-muted-foreground pt-1">
+              Cada contrato paga R$ {fmt(CONTRACT_PAYOUT)} se sua posição vencer. O lucro vem do pool das apostas perdedoras.
+            </p>
           </div>
 
+          {/* Botão de compra */}
           <Button
             variant={tipo === "time_fora" ? "danger" : tipo === "time_casa" ? "success" : "default"}
             className="w-full h-12 text-base font-bold"
             onClick={handleOrder}
-            disabled={loading || invalidAmount || semEstoque || calc.qty === 0}
+            disabled={loading || invalidAmount || calc.qty === 0}
           >
-            {loading ? <><Loader2 className="animate-spin mr-2 h-4 w-4" />Processando...</> : `Comprar ${tipoLabel(tipo)} — R$ ${fmt(calc.totalCost)}`}
+            {loading
+              ? <><Loader2 className="animate-spin mr-2 h-4 w-4" />Processando...</>
+              : `Comprar ${tipoLabel(tipo)} — R$ ${fmt(calc.totalCost)}`
+            }
           </Button>
 
+          {/* Regras */}
           {descricao && (
             <div className="rounded-lg border border-border p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
