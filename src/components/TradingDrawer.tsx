@@ -69,9 +69,7 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
   const descricao = (market as any).descricao || (market as any).resolution_rule || "";
 
   const posicaoAtual = posicoes.find((p) => p.tipo === tipo);
-  // Se não tem posição cadastrada, usa 0.50 como preço padrão (odd 2.0x)
   const pricePerContract = posicaoAtual?.preco_unitario ?? 0.50;
-  // Nunca bloqueia por falta de estoque — mercado peer-to-peer sempre aberto
   const semEstoque = false;
 
   const amount = parseCurrency(amountDisplay);
@@ -108,9 +106,8 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
     try {
       const { data, error } = await supabase.functions.invoke("criar-pagamento", {
         body: {
-          valor: calc.totalCost,
-          user_id: user.id,
-          user_email: user.email,
+          amount: calc.totalCost,      // ✅ CORRIGIDO: era "valor"
+          userId: user.id,             // ✅ CORRIGIDO: era "user_id"
           marketId: market.id,
           tipo,
           quantity: calc.qty,
