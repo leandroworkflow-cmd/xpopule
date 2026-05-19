@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Search, ChevronRight, ChevronLeft,
   Landmark, Trophy, TrendingUp,
-  Clapperboard, CloudSun, BarChart2, Globe, 
+  Clapperboard, CloudSun, BarChart2, Globe,
 } from "lucide-react";
 import { extractTeamsFromTitle } from "@/lib/teamLogos";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -300,10 +300,10 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
       {/* Header */}
       <div className="flex items-center gap-2">
         {imageUrl ? (
-          <img src={imageUrl} alt={title} className="w-8 h-8 rounded-lg object-cover bg-muted shrink-0"
+          <img src={imageUrl} alt={title} className="w-12 h-12 rounded-lg object-cover bg-muted shrink-0"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
         ) : (
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
             <span className="text-xs font-bold text-muted-foreground">{title.slice(0, 2).toUpperCase()}</span>
           </div>
         )}
