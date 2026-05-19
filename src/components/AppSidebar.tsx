@@ -1,4 +1,4 @@
-import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase, Shield, DollarSign, Radio } from "lucide-react";
+import { TrendingUp, Landmark, Clapperboard, CloudSun, Trophy, LayoutGrid, Wallet, Briefcase, Shield, DollarSign, Radio, Star } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,6 +43,7 @@ export function AppSidebar() {
     { title: "Portfólio", url: "/portfolio", icon: Briefcase },
     { title: "Ranking", url: "/ranking", icon: Trophy },
     { title: "Carteira", url: "/carteira", icon: Wallet },
+    { title: "Planos", url: "/planos", icon: Star },
     ...(isAdmin ? [
       { title: "Admin", url: "/admin", icon: Shield },
       { title: "Financeiro", url: "/admin/financeiro", icon: DollarSign },
