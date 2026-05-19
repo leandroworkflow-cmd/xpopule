@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Search, ChevronRight, ChevronLeft,
   Landmark, Trophy, TrendingUp,
-  Clapperboard, CloudSun, BarChart2, Globe,
+  Clapperboard, CloudSun, BarChart2, Globe, 
 } from "lucide-react";
 import { extractTeamsFromTitle } from "@/lib/teamLogos";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
