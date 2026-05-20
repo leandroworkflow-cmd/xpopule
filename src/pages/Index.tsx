@@ -14,8 +14,6 @@ import { extractTeamsFromTitle } from "@/lib/teamLogos";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 
-// ─── Constantes ────────────────────────────────────────────────────────────────
-
 const CATEGORIES = [
   { key: "esportes",       label: "Esportiva",          icon: Trophy,       color: "text-orange-400" },
   { key: "politica",       label: "Política",            icon: Landmark,     color: "text-blue-400" },
@@ -31,8 +29,6 @@ const CAT_BAR = [
   "Criptomoeda","Commodities","Clima","Econômicas","Menções",
   "Empresas","Financeiros","Tecnologia e Ciência",
 ];
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function filterActive(markets: DBMarket[]): DBMarket[] {
   const now = new Date();
@@ -68,14 +64,11 @@ function fmtVol(v: number | null | undefined) {
   return "—";
 }
 
-// ─── Price History hook ────────────────────────────────────────────────────────
-
 type PricePoint = { minute: number; prob_home: number; prob_away: number };
 
 function usePriceHistory(marketId: string | null) {
   const [data, setData]       = useState<PricePoint[]>([]);
   const [loading, setLoading] = useState(false);
-
   useEffect(() => {
     if (!marketId) { setData([]); return; }
     setLoading(true);
@@ -84,61 +77,29 @@ function usePriceHistory(marketId: string | null) {
       .select("minute, prob_home, prob_away")
       .eq("market_id", marketId)
       .order("minute", { ascending: true })
-      .then(({ data: rows }) => {
-        setData((rows as PricePoint[]) || []);
-        setLoading(false);
-      });
+      .then(({ data: rows }) => { setData((rows as PricePoint[]) || []); setLoading(false); });
   }, [marketId]);
-
   return { data, loading };
 }
 
-// ─── PriceChart ────────────────────────────────────────────────────────────────
-
 function PriceChart({ marketId, labelA, labelB }: { marketId: string; labelA: string; labelB: string }) {
   const { data, loading } = usePriceHistory(marketId);
-
   const chartData = useMemo(() => {
-    if (data.length > 0)
-      return data.map((d) => ({
-        name: `${d.minute}min`,
-        home: Number(d.prob_home),
-        away: Number(d.prob_away),
-      }));
-    return [0, 15, 30, 45, 60, 75, 90].map((m, i) => {
-      const base = [50, 52, 54, 50, 55, 57, 59];
-      return { name: `${m}min`, home: base[i], away: 100 - base[i] };
-    });
+    if (data.length > 0) return data.map((d) => ({ name: `${d.minute}min`, home: Number(d.prob_home), away: Number(d.prob_away) }));
+    return [0, 15, 30, 45, 60, 75, 90].map((m, i) => { const base = [50, 52, 54, 50, 55, 57, 59]; return { name: `${m}min`, home: base[i], away: 100 - base[i] }; });
   }, [data]);
-
-  if (loading)
-    return (
-      <div className="h-[110px] flex items-center justify-center text-xs text-muted-foreground">
-        Carregando gráfico...
-      </div>
-    );
-
+  if (loading) return <div className="h-[110px] flex items-center justify-center text-xs text-muted-foreground">Carregando gráfico...</div>;
   return (
     <div className="px-4 pt-3 pb-3">
       <div className="flex items-center gap-4 justify-end mb-1">
-        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span className="inline-block w-4 h-0.5 bg-emerald-400 rounded" />
-          {labelA}
-        </span>
-        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span className="inline-block w-4 border-t-2 border-dashed border-red-400" />
-          {labelB}
-        </span>
+        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="inline-block w-4 h-0.5 bg-emerald-400 rounded" />{labelA}</span>
+        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="inline-block w-4 border-t-2 border-dashed border-red-400" />{labelB}</span>
       </div>
       <ResponsiveContainer width="100%" height={110}>
         <LineChart data={chartData} margin={{ top: 2, right: 6, left: -28, bottom: 0 }}>
           <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#666" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
           <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#666" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-          <Tooltip
-            contentStyle={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, fontSize: 11, color: "#e0e0e0" }}
-            labelStyle={{ color: "#888", marginBottom: 2 }}
-            formatter={(value: number, name: string) => [`${Number(value).toFixed(1)}%`, name === "home" ? labelA : labelB]}
-          />
+          <Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, fontSize: 11, color: "#e0e0e0" }} labelStyle={{ color: "#888", marginBottom: 2 }} formatter={(value: number, name: string) => [`${Number(value).toFixed(1)}%`, name === "home" ? labelA : labelB]} />
           <Line type="monotone" dataKey="home" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
           <Line type="monotone" dataKey="away" stroke="#f87171" strokeWidth={2} dot={false} strokeDasharray="5 3" activeDot={{ r: 3 }} />
         </LineChart>
@@ -147,32 +108,58 @@ function PriceChart({ marketId, labelA, labelB }: { marketId: string; labelA: st
   );
 }
 
-// ─── FeaturedCard ──────────────────────────────────────────────────────────────
-
 function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
   const [idx, setIdx] = useState(0);
   const navigate = useNavigate();
-
   useEffect(() => setIdx(0), [markets]);
-
   if (!markets.length) return null;
 
   const featured = markets[idx];
-  const { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb, dateLabel } = getMarketInfo(featured);
+  const { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb } = getMarketInfo(featured);
   const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
   const noOdds  = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
 
+  const eventDate = (featured as any).event_date;
+  const now = new Date();
+  const eventDt = eventDate ? new Date(eventDate) : null;
+  const isToday = eventDt ? eventDt.toDateString() === now.toDateString() : false;
+  const isLive  = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 2 * 60 * 60 * 1000)) : false;
+  const eventDateLabel = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : null;
+  const eventTimeLabel = eventDt ? eventDt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
+
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className={`rounded-2xl border bg-card overflow-hidden ${isLive ? "border-red-500/50" : "border-border"}`}>
       {/* Topo */}
       <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/40">
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold text-blue-400 bg-blue-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
-            ● {featured.category || "Esportes"}
-          </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {isLive ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-400 bg-red-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-red-500/30">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+              </span>
+              AO VIVO
+            </span>
+          ) : isToday ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-orange-400 bg-orange-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-orange-500/30">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+              </span>
+              HOJE
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-blue-400 bg-blue-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              ● {featured.category || "Esportes"}
+            </span>
+          )}
+          {eventDateLabel && eventTimeLabel && (
+            <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1 rounded-full">
+              📅 {eventDateLabel} · ⏰ {eventTimeLabel}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {dateLabel && <span className="text-xs text-muted-foreground">{dateLabel}</span>}
           <button onClick={() => setIdx((i) => (i - 1 + markets.length) % markets.length)}
             className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors">
             <ChevronLeft className="h-3.5 w-3.5" />
@@ -186,10 +173,7 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
       </div>
 
       {/* Título clicável */}
-      <div
-        className="px-5 pt-4 pb-1 cursor-pointer hover:opacity-80 transition-opacity"
-        onClick={() => navigate(`/mercado/${featured.id}`)}
-      >
+      <div className="px-5 pt-4 pb-1 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
         <h2 className="text-xl font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
 
@@ -200,66 +184,41 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           <span className="w-14 text-center mr-3">Paga fora</span>
           <span className="w-16 text-center">Probabilidades</span>
         </div>
-
-        {/* Time A */}
         <div className="flex items-center py-2">
-          <div
-            className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
-            onClick={() => navigate(`/mercado/${featured.id}`)}
-          >
+          <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
             {homeLogo ? (
-              <img src={homeLogo} alt={labelA} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <img src={homeLogo} alt={labelA} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
-                {labelA.slice(0, 2).toUpperCase()}
-              </div>
+              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelA.slice(0, 2).toUpperCase()}</div>
             )}
             <span className="text-sm font-medium text-foreground truncate">{labelA}</span>
           </div>
           <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-          <button onClick={() => onSelect(featured)}
-            className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
-            {yesProb}%
-          </button>
+          <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
         </div>
-
-        {/* Time B */}
         <div className="flex items-center py-2 border-t border-border/30">
-          <div
-            className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
-            onClick={() => navigate(`/mercado/${featured.id}`)}
-          >
+          <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
             {awayLogo ? (
-              <img src={awayLogo} alt={labelB} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <img src={awayLogo} alt={labelB} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
-                {labelB.slice(0, 2).toUpperCase()}
-              </div>
+              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelB.slice(0, 2).toUpperCase()}</div>
             )}
             <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{labelB}</span>
           </div>
           <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-          <button onClick={() => onSelect(featured)}
-            className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
-            {noProb}%
-          </button>
+          <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
         </div>
       </div>
 
-      {/* Volume */}
       <div className="px-5 pb-1 flex items-center justify-between text-xs text-muted-foreground">
         <span>{fmtVol(featured.volume || 0)} vol</span>
         <span>Espalhe e Total</span>
       </div>
 
-      {/* Gráfico */}
       <div className="border-t border-border/30 mt-2">
         <PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} />
       </div>
 
-      {/* Footer pills */}
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
@@ -279,72 +238,46 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
   );
 }
 
-// ─── CategoryMiniCard ─────────────────────────────────────────────────────────
-
 function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m: DBMarket) => void }) {
   const navigate = useNavigate();
   const { title, yesProb, noProb, dateLabel } = getMarketInfo(market);
   const imageUrl = (market as any).image_url;
   const yesOdds  = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
   const noOdds   = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
-
   const parts = title.split(/ x | vs /i);
   const optA  = parts[0]?.trim().split(/[:\-–—]/)[0].trim() || "Sim";
   const optB  = parts[1]?.trim().split(/[:\-–—]/)[0].trim() || "Não";
 
   return (
-    <div
-      onClick={() => navigate(`/mercado/${market.id}`)}
-      className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3"
-    >
-      {/* Header */}
+    <div onClick={() => navigate(`/mercado/${market.id}`)} className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3">
       <div className="flex items-center gap-2">
         {imageUrl ? (
-          <img src={imageUrl} alt={title} className="w-12 h-12 rounded-lg object-cover bg-muted shrink-0"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <img src={imageUrl} alt={title} className="w-12 h-12 rounded-lg object-cover bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
         ) : (
           <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
             <span className="text-xs font-bold text-muted-foreground">{title.slice(0, 2).toUpperCase()}</span>
           </div>
         )}
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
-          {(market as any).category || ""}
-        </span>
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">{(market as any).category || ""}</span>
         {dateLabel && <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{dateLabel}</span>}
       </div>
-
-      {/* Título */}
       <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{title}</p>
-
-      {/* Opções */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <span className="text-xs text-foreground truncate mr-2">{optA}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-[10px] text-muted-foreground">{yesOdds}x</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); onSelect(market); }}
-              className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg hover:bg-emerald-500/20 transition-colors"
-            >
-              {yesProb}%
-            </button>
+            <button onClick={(e) => { e.stopPropagation(); onSelect(market); }} className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg hover:bg-emerald-500/20 transition-colors">{yesProb}%</button>
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-border/30 pt-1.5">
           <span className="text-xs text-foreground truncate mr-2 underline decoration-red-400 underline-offset-2">{optB}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="text-[10px] text-muted-foreground">{noOdds}x</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); onSelect(market); }}
-              className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-lg hover:bg-red-500/20 transition-colors"
-            >
-              {noProb}%
-            </button>
+            <button onClick={(e) => { e.stopPropagation(); onSelect(market); }} className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-lg hover:bg-red-500/20 transition-colors">{noProb}%</button>
           </div>
         </div>
       </div>
-
-      {/* Volume + link */}
       <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-auto pt-1 border-t border-border/20">
         <span>{fmtVol((market as any).volume)} vol</span>
         <span className="text-primary hover:underline">Ver mercado →</span>
@@ -353,18 +286,9 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
   );
 }
 
-// ─── CategoryGrid ─────────────────────────────────────────────────────────────
-
-function CategoryGrid({
-  cat,
-  onSelect,
-}: {
-  cat: { key: string; label: string; icon: React.ElementType; color: string; markets: DBMarket[] };
-  onSelect: (m: DBMarket) => void;
-}) {
+function CategoryGrid({ cat, onSelect }: { cat: { key: string; label: string; icon: React.ElementType; color: string; markets: DBMarket[] }; onSelect: (m: DBMarket) => void }) {
   const top4 = cat.markets.slice(0, 4);
   if (!top4.length) return null;
-
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -373,51 +297,36 @@ function CategoryGrid({
           <h2 className="text-base font-bold text-foreground">{cat.label}</h2>
           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cat.markets.length}</span>
         </div>
-        <span className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-0.5">
-          Ver todos <ChevronRight className="h-3 w-3" />
-        </span>
+        <span className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-0.5">Ver todos <ChevronRight className="h-3 w-3" /></span>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {top4.map((m) => (
-          <CategoryMiniCard key={m.id} market={m} onSelect={onSelect} />
-        ))}
+        {top4.map((m) => <CategoryMiniCard key={m.id} market={m} onSelect={onSelect} />)}
       </div>
     </div>
   );
 }
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-
 function Sidebar({ markets }: { markets: DBMarket[] }) {
   const trending = useMemo(() => [...markets].sort((a, b) => b.volume - a.volume).slice(0, 5), [markets]);
   const recent   = useMemo(() => [...markets].reverse().slice(0, 4), [markets]);
-
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-xl border border-emerald-500/20 overflow-hidden" style={{ background: "linear-gradient(135deg,#0f2a1a,#111827)" }}>
         <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🏆</span>
-            <span className="text-sm font-semibold text-foreground">Basquete Pro Playoffs</span>
-          </div>
+          <div className="flex items-center gap-2"><span className="text-lg">🏆</span><span className="text-sm font-semibold text-foreground">Basquete Pro Playoffs</span></div>
           <ChevronRight className="h-4 w-4 text-emerald-400" />
         </div>
       </div>
-
       <div className="rounded-xl border border-violet-500/20 overflow-hidden" style={{ background: "linear-gradient(135deg,#0f0f2a,#111827)" }}>
         <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📊</span>
-            <span className="text-sm font-semibold text-foreground">Empresa KPIs</span>
-          </div>
+          <div className="flex items-center gap-2"><span className="text-lg">📊</span><span className="text-sm font-semibold text-foreground">Empresa KPIs</span></div>
           <ChevronRight className="h-4 w-4 text-violet-400" />
         </div>
       </div>
-
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
           <span className="text-sm font-bold text-foreground">Tendência</span>
-          <span className="text-xs text-primary cursor-pointer hover:underline">› ver mais</span>
+          <span className="text-xs text-primary cursor-pointer hover:underline">ver mais</span>
         </div>
         <div className="divide-y divide-border/30">
           {trending.map((m, i) => {
@@ -432,20 +341,17 @@ function Sidebar({ markets }: { markets: DBMarket[] }) {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs font-bold text-foreground">{p}%</p>
-                  <p className={`text-[10px] ${d >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {d >= 0 ? "▲" : "▼"} {Math.abs(d)}
-                  </p>
+                  <p className={`text-[10px] ${d >= 0 ? "text-emerald-400" : "text-red-400"}`}>{d >= 0 ? "▲" : "▼"} {Math.abs(d)}</p>
                 </div>
               </div>
             );
           })}
         </div>
       </div>
-
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
           <span className="text-sm font-bold text-foreground">Mais Recentes</span>
-          <span className="text-xs text-primary cursor-pointer hover:underline">› ver mais</span>
+          <span className="text-xs text-primary cursor-pointer hover:underline">ver mais</span>
         </div>
         <div className="divide-y divide-border/30">
           {recent.map((m, i) => {
@@ -467,101 +373,61 @@ function Sidebar({ markets }: { markets: DBMarket[] }) {
   );
 }
 
-// ─── Page principal ────────────────────────────────────────────────────────────
-
 const Index = () => {
   const [selectedMarket, setSelectedMarket] = useState<DBMarket | null>(null);
   const [search, setSearch]                 = useState("");
   const [activeCategory, setActiveCategory] = useState("todos");
   const [activeCatBar, setActiveCatBar]     = useState("Tendência");
-
   const { data: allMarkets, isLoading } = useMarkets(null);
   const { data: posicoes = [] }         = useMarketPosicoes(selectedMarket?.id ?? "");
-
-  const activeMarkets = useMemo(() => {
-    if (!allMarkets) return [];
-    return filterActive(allMarkets);
-  }, [allMarkets]);
-
-  const sportsMarkets = useMemo(() =>
-    activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume),
-    [activeMarkets]);
-
-  const otherCategories = useMemo(() =>
-    CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({
-      ...cat,
-      markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume),
-    })).filter((c) => c.markets.length > 0),
-    [activeMarkets]);
-
+  const activeMarkets = useMemo(() => { if (!allMarkets) return []; return filterActive(allMarkets); }, [allMarkets]);
+  const sportsMarkets = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
+  const otherCategories = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
   const displayMarkets = useMemo(() => {
     let base = activeMarkets;
     if (activeCategory !== "todos") base = base.filter((m) => m.category === activeCategory);
     if (search) base = base.filter((m) => ((m as any).nome || m.title || "").toLowerCase().includes(search.toLowerCase()));
     return base.sort((a, b) => b.volume - a.volume);
   }, [activeMarkets, activeCategory, search]);
-
   const isSearching = !!search || activeCategory !== "todos";
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Category bar */}
       <div className="border-b border-border/50 bg-card/60 sticky top-0 z-20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {CAT_BAR.map((c) => (
             <button key={c} onClick={() => setActiveCatBar(c)}
-              className={`shrink-0 text-xs px-3 py-3 border-b-2 transition-all whitespace-nowrap ${
-                activeCatBar === c ? "border-primary text-foreground font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}>
+              className={`shrink-0 text-xs px-3 py-3 border-b-2 transition-all whitespace-nowrap ${activeCatBar === c ? "border-primary text-foreground font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
               {c}
             </button>
           ))}
         </div>
       </div>
-
       <div className="max-w-6xl mx-auto px-4 py-5">
-        {/* Search + pills */}
         <div className="flex flex-wrap items-center gap-3 mb-5">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar eventos..." value={search} onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-card border-border h-10 text-sm rounded-xl" />
+            <Input placeholder="Buscar eventos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-card border-border h-10 text-sm rounded-xl" />
           </div>
           <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            <button onClick={() => setActiveCategory("todos")}
-              className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                activeCategory === "todos" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
-              }`}>
-              Todos
-            </button>
+            <button onClick={() => setActiveCategory("todos")} className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${activeCategory === "todos" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>Todos</button>
             {CATEGORIES.map((cat) => (
               <button key={cat.key} onClick={() => setActiveCategory(cat.key)}
-                className={`shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                  activeCategory === cat.key ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
-                }`}>
+                className={`shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${activeCategory === cat.key ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
                 <cat.icon className={`h-3 w-3 ${activeCategory === cat.key ? "text-primary-foreground" : cat.color}`} />
                 {cat.label}
               </button>
             ))}
           </div>
         </div>
-
-        {/* Grid principal */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
           <div>
             {isLoading ? (
-              <div className="flex flex-col gap-3">
-                {Array.from({ length: 3 }).map((_, i) => <MarketCardSkeleton key={i} />)}
-              </div>
+              <div className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => <MarketCardSkeleton key={i} />)}</div>
             ) : isSearching ? (
               displayMarkets.length === 0 ? (
-                <div className="text-center py-20 text-muted-foreground">
-                  <Globe className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                  <p>Nenhum mercado encontrado.</p>
-                </div>
-              ) : (
-                <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
-              )
+                <div className="text-center py-20 text-muted-foreground"><Globe className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>Nenhum mercado encontrado.</p></div>
+              ) : <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
             ) : (
               <div className="flex flex-col gap-8">
                 {sportsMarkets.length > 0 && (
@@ -574,25 +440,14 @@ const Index = () => {
                     <FeaturedCard markets={sportsMarkets} onSelect={setSelectedMarket} />
                   </div>
                 )}
-                {otherCategories.map((cat) => (
-                  <CategoryGrid key={cat.key} cat={cat} onSelect={setSelectedMarket} />
-                ))}
+                {otherCategories.map((cat) => <CategoryGrid key={cat.key} cat={cat} onSelect={setSelectedMarket} />)}
               </div>
             )}
           </div>
-
-          <div className="hidden lg:block">
-            <Sidebar markets={activeMarkets} />
-          </div>
+          <div className="hidden lg:block"><Sidebar markets={activeMarkets} /></div>
         </div>
       </div>
-
-      <TradingDrawer
-        market={selectedMarket}
-        open={!!selectedMarket}
-        onClose={() => setSelectedMarket(null)}
-        posicoes={posicoes}
-      />
+      <TradingDrawer market={selectedMarket} open={!!selectedMarket} onClose={() => setSelectedMarket(null)} posicoes={posicoes} />
     </div>
   );
 };
