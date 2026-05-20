@@ -13,7 +13,15 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
   const catLabel = categoryLabels[market.category] || market.category;
   const catColor = categoryColors[market.category] || "bg-muted text-muted-foreground";
   const CatIcon = categoryIcons[market.category] || TrendingUp;
-  const endDate = new Date(market.end_date).toLocaleDateString("pt-BR");
+  const endDateObj = new Date(market.end_date);
+  const endDate = endDateObj.toLocaleDateString("pt-BR");
+  const matchDateStr = endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const matchTimeStr = endDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const now = new Date();
+  const isToday =
+    endDateObj.getFullYear() === now.getFullYear() &&
+    endDateObj.getMonth() === now.getMonth() &&
+    endDateObj.getDate() === now.getDate();
 
   const total = (market.yes_price || 50) + (market.no_price || 50);
   const yesPct = total > 0 ? Math.round(((market.yes_price || 50) / total) * 100) : 50;
@@ -43,6 +51,15 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
           <CatIcon className="h-3 w-3" />
           {catLabel}
         </span>
+        {hasTeams && isToday && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+            </span>
+            AO VIVO
+          </span>
+        )}
         {(volHome + volDraw + volAway) > 0 && (
           <span className="text-[10px] text-muted-foreground ml-auto">
             {fmtVol(volHome + volDraw + volAway)} total
@@ -53,6 +70,9 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
       {/* Teams vs display */}
       {hasTeams ? (
         <>
+          <div className="text-center text-[11px] text-muted-foreground font-medium px-4 pb-1">
+            {matchDateStr} • {matchTimeStr}
+          </div>
           <h3 className="font-semibold text-xs text-foreground px-4 pb-2 leading-snug line-clamp-2 text-center capitalize">
             {title}
           </h3>
