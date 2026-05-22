@@ -4,7 +4,7 @@ const FOOTBALL_KEY = "ab7e687d7ff24053837db64af9b56453";
 const SUPABASE_URL = "https://odexmyskaespjusivjua.supabase.co";
 const SUPABASE_KEY = "sb_publishable_s9oIKQj9UXCPucjw1cmzlw_N3HqxH-Y";
 const SPORTSDB_KEY = "123";
-const DAYS_AHEAD   = 14;
+const DAYS_AHEAD   = 3;
 
 // ── FUTEBOL CONFIG ────────────────────────────────────────────────────────────
 
@@ -136,8 +136,9 @@ async function fetchEsporte(sport) {
     await sleep(2200);
   }
 
-  console.log(eventos.length + " eventos.");
-  return eventos;
+  const limitados = eventos.slice(0, 10);
+  console.log(limitados.length + " eventos.");
+  return limitados;
 }
 
 // ── SALVAR NO SUPABASE ────────────────────────────────────────────────────────
