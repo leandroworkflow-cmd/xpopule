@@ -111,7 +111,7 @@ async function fetchEsporte(sport) {
         // Pega só eventos não iniciados (NS) ou sem placar ainda
         const naoiniciado = ev.strStatus === "NS" || ev.strStatus === "" || ev.strStatus === null;
         const semPlacar   = ev.intHomeScore === null && ev.intAwayScore === null;
-        if (!naoiniciado && !semPlacar) continue;
+        if (naoiniciado === false && semPlacar === false) continue;
 
         vistos.add(ev.idEvent);
 
