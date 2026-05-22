@@ -120,27 +120,29 @@ async function fetchNBA() {
 
 async function fetchMMA() {
   process.stdout.write("  Buscando MMA/UFC... ");
-  const { start, end } = getDateRange(30);
-  const url = "https://mma.balldontlie.io/api/v1/events"
-    + "?start_date=" + start
-    + "&end_date=" + end
-    + "&per_page=25";
+  const ano = new Date().getFullYear();
+  const url = "https://api.balldontlie.io/mma/v1/events?year=" + ano + "&per_page=100";
 
   const res = await fetch(url, { headers: { Authorization: BDL_KEY } });
   if (!res.ok) { console.log("Erro " + res.status); return []; }
   const data = await res.json();
-  const eventos = data.data || [];
+  const agora = new Date();
+
+  const eventos = (data.data || []).filter(e => {
+    const s = (e.status || "").toLowerCase();
+    return s === "scheduled" && new Date(e.date) > agora;
+  });
 
   console.log(eventos.length + " eventos.");
-  return eventos.map(e => {
-    const dataEvento = new Date(e.date || e.datetime || e.start_date);
+  return eventos.slice(0, 10).map(e => {
+    const dataEvento = new Date(e.date);
     const endDate    = new Date(dataEvento.getTime() - 60 * 60 * 1000);
     return {
       id:         "mma_" + e.id,
-      nome:       e.name || e.title || "Evento MMA",
+      nome:       e.name,
       end_date:   endDate.toISOString().split("T")[0],
       event_date: dataEvento.toISOString(),
-      home_logo:  e.image || null,
+      home_logo:  null,
       away_logo:  null,
       status:     "active",
       category:   "luta",
@@ -157,9 +159,9 @@ async function fetchTenis() {
   const { start, end } = getDateRange(14);
 
   const [resATP, resWTA] = await Promise.all([
-    fetch("https://atp.balldontlie.io/api/v1/matches?start_date=" + start + "&end_date=" + end + "&per_page=25",
+    fetch("https://api.balldontlie.io/atp/v1/matches?start_date=" + start + "&end_date=" + end + "&per_page=25",
       { headers: { Authorization: BDL_KEY } }),
-    fetch("https://wta.balldontlie.io/api/v1/matches?start_date=" + start + "&end_date=" + end + "&per_page=25",
+    fetch("https://api.balldontlie.io/wta/v1/matches?start_date=" + start + "&end_date=" + end + "&per_page=25",
       { headers: { Authorization: BDL_KEY } }),
   ]);
 
