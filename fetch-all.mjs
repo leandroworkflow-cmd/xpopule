@@ -1,10 +1,9 @@
 import fetch from "node-fetch";
 
-const FOOTBALL_KEY = "ab7e687d7ff24053837db64af9b56453";
-const SUPABASE_URL = "https://odexmyskaespjusivjua.supabase.co";
-const SUPABASE_KEY = "sb_publishable_s9oIKQj9UXCPucjw1cmzlw_N3HqxH-Y";
-const SPORTSDB_KEY = "123";
-const DAYS_AHEAD   = 3;
+const FOOTBALL_KEY  = "ab7e687d7ff24053837db64af9b56453";
+const SUPABASE_URL  = "https://odexmyskaespjusivjua.supabase.co";
+const SUPABASE_KEY  = "sb_publishable_s9oIKQj9UXCPucjw1cmzlw_N3HqxH-Y";
+const BDL_KEY       = "ee89e01a-4107-4947-a427-f508cb69fd7f";
 
 // ── FUTEBOL CONFIG ────────────────────────────────────────────────────────────
 
@@ -28,35 +27,25 @@ const TIMES_PT = {
   "EC Vitoria": "Vitoria", "Red Bull Bragantino": "Bragantino",
 };
 
-// ── OUTROS ESPORTES CONFIG ────────────────────────────────────────────────────
-
-const OUTROS_ESPORTES = [
-  { name: "Basketball", label: "Basquete",     category: "basquete" },
-  { name: "Fighting",   label: "Boxe/MMA/UFC", category: "luta"     },
-  { name: "Tennis",     label: "Tenis",        category: "tenis"    },
-  { name: "Volleyball", label: "Volei",        category: "volei"    },
-];
-
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 
 function traduzir(nome) { return TIMES_PT[nome] || nome; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-function nextDates(n) {
-  const dates = [];
-  const now = new Date();
-  for (let i = 0; i < n; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() + i);
-    dates.push(d.toISOString().split("T")[0]);
-  }
-  return dates;
+function getDateRange(daysAhead) {
+  const start = new Date();
+  const end   = new Date();
+  end.setDate(end.getDate() + daysAhead);
+  return {
+    start: start.toISOString().split("T")[0],
+    end:   end.toISOString().split("T")[0],
+  };
 }
 
 const hoje = new Date();
 hoje.setHours(0, 0, 0, 0);
 
-// ── FUTEBOL ───────────────────────────────────────────────────────────────────
+// ── FUTEBOL (football-data.org) ───────────────────────────────────────────────
 
 async function fetchJogos(comp) {
   console.log("  Buscando " + comp.nome + "...");
@@ -88,64 +77,127 @@ async function fetchJogos(comp) {
   });
 }
 
-// ── OUTROS ESPORTES ───────────────────────────────────────────────────────────
+// ── NBA (balldontlie.io) ──────────────────────────────────────────────────────
 
-async function fetchEsporte(sport) {
-  process.stdout.write("  Buscando " + sport.label + "... ");
-  const base   = "https://www.thesportsdb.com/api/v1/json/" + SPORTSDB_KEY;
-  const dates  = nextDates(DAYS_AHEAD);
-  const vistos = new Set();
-  const eventos = [];
+async function fetchNBA() {
+  process.stdout.write("  Buscando NBA... ");
+  const { start, end } = getDateRange(7);
+  const url = "https://api.balldontlie.io/v1/games"
+    + "?start_date=" + start
+    + "&end_date=" + end
+    + "&per_page=100";
 
-  for (const date of dates) {
-    try {
-      const res = await fetch(
-        base + "/eventsday.php?d=" + date + "&s=" + encodeURIComponent(sport.name)
-      );
-      if (!res.ok) { await sleep(2200); continue; }
-      const data = await res.json();
+  const res = await fetch(url, { headers: { Authorization: BDL_KEY } });
+  if (!res.ok) { console.log("Erro " + res.status); return []; }
+  const data = await res.json();
+  const jogos = (data.data || []).filter(g => {
+    const status = (g.status || "").toLowerCase();
+    return status.includes("pm") || status.includes("am") || status.includes(":");
+  });
 
-      for (const ev of (data?.events || [])) {
-        if (vistos.has(ev.idEvent)) continue;
+  console.log(jogos.length + " jogos.");
+  return jogos.map(g => {
+    const home     = g.home_team.full_name;
+    const away     = g.visitor_team.full_name;
+    const dataJogo = new Date(g.datetime || g.date);
+    const endDate  = new Date(dataJogo.getTime() - 60 * 60 * 1000);
+    return {
+      id:         "nba_" + g.id,
+      nome:       home + " x " + away,
+      end_date:   endDate.toISOString().split("T")[0],
+      event_date: g.datetime || g.date + "T00:00:00Z",
+      home_logo:  null,
+      away_logo:  null,
+      status:     "active",
+      category:   "basquete",
+      volume:     0,
+      yes_prob:   50,
+    };
+  });
+}
 
-        // Pega só eventos não iniciados
-        const status = (ev.strStatus || "").toUpperCase();
-        if (status !== "NS" && status !== "") continue;
+// ── MMA/UFC (balldontlie.io) ──────────────────────────────────────────────────
 
-        vistos.add(ev.idEvent);
+async function fetchMMA() {
+  process.stdout.write("  Buscando MMA/UFC... ");
+  const { start, end } = getDateRange(30);
+  const url = "https://mma.balldontlie.io/api/v1/events"
+    + "?start_date=" + start
+    + "&end_date=" + end
+    + "&per_page=25";
 
-        const iso = ev.strTime
-          ? ev.dateEvent + "T" + ev.strTime + ":00Z"
-          : ev.dateEvent + "T00:00:00Z";
-        const endDate = new Date(new Date(iso).getTime() - 60 * 60 * 1000);
+  const res = await fetch(url, { headers: { Authorization: BDL_KEY } });
+  if (!res.ok) { console.log("Erro " + res.status); return []; }
+  const data = await res.json();
+  const eventos = data.data || [];
 
-        eventos.push({
-          id:         "sdb_" + ev.idEvent,
-          nome:       ev.strEvent,
-          end_date:   endDate.toISOString().split("T")[0],
-          event_date: iso,
-          home_logo:  ev.strHomeTeamBadge || ev.strThumb || null,
-          away_logo:  ev.strAwayTeamBadge || null,
-          status:     "active",
-          category:   sport.category,
-          volume:     0,
-          yes_prob:   50,
-        });
-      }
-    } catch (_) {}
-    await sleep(2200);
-  }
+  console.log(eventos.length + " eventos.");
+  return eventos.map(e => {
+    const dataEvento = new Date(e.date || e.datetime || e.start_date);
+    const endDate    = new Date(dataEvento.getTime() - 60 * 60 * 1000);
+    return {
+      id:         "mma_" + e.id,
+      nome:       e.name || e.title || "Evento MMA",
+      end_date:   endDate.toISOString().split("T")[0],
+      event_date: dataEvento.toISOString(),
+      home_logo:  e.image || null,
+      away_logo:  null,
+      status:     "active",
+      category:   "luta",
+      volume:     0,
+      yes_prob:   50,
+    };
+  });
+}
 
-  const limitados = eventos.slice(0, 10);
-  console.log(limitados.length + " eventos.");
-  return limitados;
+// ── TÊNIS ATP (balldontlie.io) ────────────────────────────────────────────────
+
+async function fetchTenis() {
+  process.stdout.write("  Buscando Tenis (ATP/WTA)... ");
+  const { start, end } = getDateRange(14);
+
+  const [resATP, resWTA] = await Promise.all([
+    fetch("https://atp.balldontlie.io/api/v1/matches?start_date=" + start + "&end_date=" + end + "&per_page=25",
+      { headers: { Authorization: BDL_KEY } }),
+    fetch("https://wta.balldontlie.io/api/v1/matches?start_date=" + start + "&end_date=" + end + "&per_page=25",
+      { headers: { Authorization: BDL_KEY } }),
+  ]);
+
+  const atpData = resATP.ok ? (await resATP.json()).data || [] : [];
+  const wtaData = resWTA.ok ? (await resWTA.json()).data || [] : [];
+  const todos   = [...atpData, ...wtaData];
+
+  const futuros = todos.filter(m => {
+    const s = (m.status || "").toLowerCase();
+    return s === "scheduled" || s === "ns" || s === "" || s === "upcoming";
+  });
+
+  console.log(futuros.length + " partidas.");
+  return futuros.slice(0, 15).map(m => {
+    const p1       = m.player1?.full_name || m.home?.name || "Atleta 1";
+    const p2       = m.player2?.full_name || m.away?.name || "Atleta 2";
+    const dataJogo = new Date(m.datetime || m.date || start);
+    const endDate  = new Date(dataJogo.getTime() - 60 * 60 * 1000);
+    return {
+      id:         "tenis_" + m.id,
+      nome:       p1 + " x " + p2,
+      end_date:   endDate.toISOString().split("T")[0],
+      event_date: dataJogo.toISOString(),
+      home_logo:  null,
+      away_logo:  null,
+      status:     "active",
+      category:   "tenis",
+      volume:     0,
+      yes_prob:   50,
+    };
+  });
 }
 
 // ── SALVAR NO SUPABASE ────────────────────────────────────────────────────────
 
 async function salvar(markets) {
   if (!markets.length) { console.log("Nenhum mercado."); return; }
-  console.log("Salvando " + markets.length + " markets...");
+  console.log("\nSalvando " + markets.length + " markets...");
 
   for (let i = 0; i < markets.length; i += 50) {
     const lote = markets.slice(i, i + 50);
@@ -161,7 +213,6 @@ async function salvar(markets) {
     });
     if (!res.ok) { const e = await res.text(); console.error("Erro lote " + i + ": " + e); }
   }
-
   console.log("Salvo!");
 }
 
@@ -173,16 +224,16 @@ async function salvar(markets) {
 
   console.log("\n[Futebol — football-data.org]");
   for (const comp of COMPETICOES) {
-    const jogos = await fetchJogos(comp);
-    todos.push(...jogos);
+    todos.push(...await fetchJogos(comp));
     await sleep(1000);
   }
 
-  console.log("\n[Outros Esportes — TheSportsDB]");
-  for (const sport of OUTROS_ESPORTES) {
-    const eventos = await fetchEsporte(sport);
-    todos.push(...eventos);
-  }
+  console.log("\n[Outros Esportes — balldontlie.io]");
+  todos.push(...await fetchNBA());
+  await sleep(500);
+  todos.push(...await fetchMMA());
+  await sleep(500);
+  todos.push(...await fetchTenis());
 
   const unicos = Object.values(Object.fromEntries(todos.map(j => [j.id, j])));
   console.log("\nTotal: " + unicos.length + " eventos.");
