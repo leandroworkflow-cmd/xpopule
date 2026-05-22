@@ -69,10 +69,10 @@ async function fetchJogos(comp) {
   const jogos = (data.matches || []).filter(j => new Date(j.utcDate) > hoje);
   console.log("  " + jogos.length + " jogos futuros.");
   return jogos.map(j => {
-    const home      = traduzir(j.homeTeam.name);
-    const away      = traduzir(j.awayTeam.name);
-    const dataJogo  = new Date(j.utcDate);
-    const endDate   = new Date(dataJogo.getTime() - 60 * 60 * 1000);
+    const home     = traduzir(j.homeTeam.name);
+    const away     = traduzir(j.awayTeam.name);
+    const dataJogo = new Date(j.utcDate);
+    const endDate  = new Date(dataJogo.getTime() - 60 * 60 * 1000);
     return {
       id:         "jogo_fd_" + j.id,
       nome:       home + " x " + away,
@@ -99,16 +99,27 @@ async function fetchEsporte(sport) {
 
   for (const date of dates) {
     try {
-      const res = await fetch(base + "/eventsday.php?d=" + date + "&s=" + encodeURIComponent(sport.name));
+      const res = await fetch(
+        base + "/eventsday.php?d=" + date + "&s=" + encodeURIComponent(sport.name)
+      );
       if (!res.ok) { await sleep(2200); continue; }
       const data = await res.json();
+
       for (const ev of (data?.events || [])) {
         if (vistos.has(ev.idEvent)) continue;
+
+        // Pega só eventos não iniciados (NS) ou sem placar ainda
+        const naoiniciado = ev.strStatus === "NS" || ev.strStatus === "" || ev.strStatus === null;
+        const semPlacar   = ev.intHomeScore === null && ev.intAwayScore === null;
+        if (!naoiniciado && !semPlacar) continue;
+
         vistos.add(ev.idEvent);
+
         const iso = ev.strTime
           ? ev.dateEvent + "T" + ev.strTime + ":00Z"
           : ev.dateEvent + "T00:00:00Z";
         const endDate = new Date(new Date(iso).getTime() - 60 * 60 * 1000);
+
         eventos.push({
           id:         "sdb_" + ev.idEvent,
           nome:       ev.strEvent,
@@ -160,7 +171,6 @@ async function salvar(markets) {
   console.log("=== Importador Unificado de Esportes ===");
   const todos = [];
 
-  // Futebol
   console.log("\n[Futebol — football-data.org]");
   for (const comp of COMPETICOES) {
     const jogos = await fetchJogos(comp);
@@ -168,17 +178,14 @@ async function salvar(markets) {
     await sleep(1000);
   }
 
-  // Outros esportes
   console.log("\n[Outros Esportes — TheSportsDB]");
   for (const sport of OUTROS_ESPORTES) {
     const eventos = await fetchEsporte(sport);
     todos.push(...eventos);
   }
 
-  // Remove duplicatas por id
   const unicos = Object.values(Object.fromEntries(todos.map(j => [j.id, j])));
   console.log("\nTotal: " + unicos.length + " eventos.");
-
   await salvar(unicos);
   console.log("Feito!");
 })();
