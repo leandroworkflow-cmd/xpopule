@@ -7,18 +7,40 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft, Info, TrendingUp, BarChart3, Sparkles, Lock, X } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { extractTeamsFromTitle } from "@/lib/teamLogos";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useNavigate as useNav } from "react-router-dom";
+
+// ── hook: opções do mercado ───────────────────────────────────────────────────
+function useOpcoesMercado(marketId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["opcoes_mercado", marketId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("opcoes_mercado")
+        .select("*")
+        .eq("market_id", marketId)
+        .order("ordem", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled,
+  });
+}
 
 const MarketDetail = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const { id }     = useParams<{ id: string }>();
+  const navigate   = useNavigate();
   const { data: market, isLoading } = useMarket(id || "");
-  const { data: posicoes = [] } = useMarketPosicoes(id || "");
+  const { data: posicoes = [] }     = useMarketPosicoes(id || "");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedOpcao, setSelectedOpcao] = useState<any>(null);
+
+  const tipoMercado = (market as any)?.tipo_mercado || "binario";
+  const isMulti     = tipoMercado === "multiplo" || tipoMercado === "periodo";
+  const { data: opcoes = [] } = useOpcoesMercado(id || "", isMulti);
 
   // ── IA Analysis ───────────────────────────────────────────────────────────
   const { user } = useAuth();
@@ -40,25 +62,16 @@ const MarketDetail = () => {
 
   const handleAnalysis = async () => {
     if (!user) { toast.error("Faça login para continuar"); return; }
-
-    // Verifica plano
     const pro = await checkPlan();
     setIsPro(pro);
-
-    if (!pro) {
-      setShowAnalysis(true); // mostra o paywall
-      return;
-    }
-
+    if (!pro) { setShowAnalysis(true); return; }
     setShowAnalysis(true);
     setLoadingAI(true);
     setAnalysis(null);
-
     try {
       const { data, error } = await supabase.functions.invoke("ai-analysis", {
         body: { marketId: id, userId: user.id },
       });
-
       if (error || !data?.analysis) throw new Error(error?.message ?? "Erro ao gerar análise");
       setAnalysis(data.analysis);
     } catch (e: any) {
@@ -69,8 +82,10 @@ const MarketDetail = () => {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const formatAnalysis = (text: string) =>
+    text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>");
 
+  // ── Loading / Not found ───────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto space-y-4">
@@ -91,20 +106,15 @@ const MarketDetail = () => {
 
   const catLabel = categoryLabels[market.category] || market.category;
   const catColor = categoryColors[market.category] || "bg-muted text-muted-foreground";
-  const CatIcon = categoryIcons[market.category] || TrendingUp;
-  const endDate = new Date(market.end_date).toLocaleDateString("pt-BR");
+  const CatIcon  = categoryIcons[market.category]  || TrendingUp;
+  const endDate  = new Date(market.end_date).toLocaleDateString("pt-BR");
+  const title    = (market as any).nome || market.title || "";
 
-  const total = market.yes_price + market.no_price;
-  const yesPct = total > 0 ? Math.round((market.yes_price / total) * 100) : 50;
-  const noPct = 100 - yesPct;
-  const yesMultiplier = market.yes_price > 0 ? (100 / market.yes_price).toFixed(1) : "—";
-  const noMultiplier = market.no_price > 0 ? (100 / market.no_price).toFixed(1) : "—";
-
-  // Formata o markdown simples da análise
-  const formatAnalysis = (text: string) =>
-    text
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\n/g, "<br/>");
+  const total          = (market.yes_price || 0) + (market.no_price || 0);
+  const yesPct         = total > 0 ? Math.round((market.yes_price / total) * 100) : 50;
+  const noPct          = 100 - yesPct;
+  const yesMultiplier  = market.yes_price > 0 ? (100 / market.yes_price).toFixed(1) : "—";
+  const noMultiplier   = market.no_price  > 0 ? (100 / market.no_price).toFixed(1)  : "—";
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -113,6 +123,7 @@ const MarketDetail = () => {
       </Button>
 
       <div className="flex flex-col lg:flex-row gap-6">
+        {/* ── COLUNA ESQUERDA ─────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-3">
             <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${catColor}`}>
@@ -127,50 +138,45 @@ const MarketDetail = () => {
             )}
           </div>
 
+          {/* Escudos de times (esportes) */}
           {(() => {
-            const teams = extractTeamsFromTitle(market.title);
-            if (teams) {
-              return (
-                <div className="flex items-center justify-center gap-6 py-4 mb-4 rounded-xl border border-border bg-card/50">
-                  <div className="flex flex-col items-center gap-2">
-                    <img src={teams.teamA.logo} alt={teams.teamA.name} className="h-16 w-16 object-contain" />
-                    <span className="text-sm font-bold text-foreground capitalize">{teams.teamA.name}</span>
-                  </div>
-                  <span className="text-lg font-black text-muted-foreground">VS</span>
-                  <div className="flex flex-col items-center gap-2">
-                    <img src={teams.teamB.logo} alt={teams.teamB.name} className="h-16 w-16 object-contain" />
-                    <span className="text-sm font-bold text-foreground capitalize">{teams.teamB.name}</span>
-                  </div>
+            const teams = extractTeamsFromTitle(title);
+            if (!teams) return null;
+            return (
+              <div className="flex items-center justify-center gap-6 py-4 mb-4 rounded-xl border border-border bg-card/50">
+                <div className="flex flex-col items-center gap-2">
+                  <img src={teams.teamA.logo} alt={teams.teamA.name} className="h-16 w-16 object-contain" />
+                  <span className="text-sm font-bold text-foreground capitalize">{teams.teamA.name}</span>
                 </div>
-              );
-            }
-            return null;
+                <span className="text-lg font-black text-muted-foreground">VS</span>
+                <div className="flex flex-col items-center gap-2">
+                  <img src={teams.teamB.logo} alt={teams.teamB.name} className="h-16 w-16 object-contain" />
+                  <span className="text-sm font-bold text-foreground capitalize">{teams.teamB.name}</span>
+                </div>
+              </div>
+            );
           })()}
 
-          <h1 className="text-2xl font-bold text-foreground mb-2 capitalize">{market.title}</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2 capitalize">{title}</h1>
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
             <Calendar className="h-4 w-4" />
             Encerra em: {endDate}
           </div>
 
-          {market.image_url && !extractTeamsFromTitle(market.title) && (
+          {(market as any).image_url && !extractTeamsFromTitle(title) && (
             <div className="h-48 rounded-xl overflow-hidden mb-6 bg-background/50">
-              <img src={market.image_url} alt={market.title} className="h-full w-full object-cover" />
+              <img src={(market as any).image_url} alt={title} className="h-full w-full object-cover" />
             </div>
           )}
 
-          {/* ── Botão Análise IA ── */}
+          {/* Botão IA */}
           {!showAnalysis && (
-            <Button
-              className="w-full mb-6 h-12 font-bold gap-2 bg-gradient-to-r from-primary to-purple-500 hover:opacity-90"
-              onClick={handleAnalysis}
-            >
-              <Sparkles className="h-4 w-4" />
-              Ver Análise da IA
+            <Button className="w-full mb-6 h-12 font-bold gap-2 bg-gradient-to-r from-primary to-purple-500 hover:opacity-90" onClick={handleAnalysis}>
+              <Sparkles className="h-4 w-4" /> Ver Análise da IA
             </Button>
           )}
 
-          {/* ── Painel de Análise ── */}
+          {/* Painel IA */}
           {showAnalysis && (
             <div className="rounded-xl border border-primary/30 bg-card mb-6 overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-primary/5">
@@ -182,9 +188,7 @@ const MarketDetail = () => {
                   <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                 </button>
               </div>
-
               <div className="p-5">
-                {/* Paywall para usuários free */}
                 {isPro === false && (
                   <div className="text-center space-y-4 py-4">
                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
@@ -192,41 +196,32 @@ const MarketDetail = () => {
                     </div>
                     <div>
                       <p className="font-bold text-foreground mb-1">Recurso exclusivo Pro</p>
-                      <p className="text-sm text-muted-foreground">
-                        Faça upgrade para o plano Pro e tenha acesso a análises de IA em todos os mercados.
-                      </p>
+                      <p className="text-sm text-muted-foreground">Faça upgrade para o plano Pro e tenha acesso a análises de IA em todos os mercados.</p>
                     </div>
                     <Button className="w-full font-bold" onClick={() => navigate("/planos")}>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Ver planos
+                      <Sparkles className="h-4 w-4 mr-2" /> Ver planos
                     </Button>
                   </div>
                 )}
-
-                {/* Loading */}
                 {loadingAI && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-                      Gerando análise...
+                      <Sparkles className="h-4 w-4 text-primary animate-pulse" /> Gerando análise...
                     </div>
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className={`h-4 rounded bg-muted/40 animate-pulse`} style={{ width: `${85 - i * 10}%` }} />
+                      <div key={i} className="h-4 rounded bg-muted/40 animate-pulse" style={{ width: `${85 - i * 10}%` }} />
                     ))}
                   </div>
                 )}
-
-                {/* Análise gerada */}
                 {analysis && (
-                  <div
-                    className="text-sm text-foreground leading-relaxed space-y-2"
-                    dangerouslySetInnerHTML={{ __html: formatAnalysis(analysis) }}
-                  />
+                  <div className="text-sm text-foreground leading-relaxed space-y-2"
+                    dangerouslySetInnerHTML={{ __html: formatAnalysis(analysis) }} />
                 )}
               </div>
             </div>
           )}
 
+          {/* Histórico de Preço */}
           <div className="rounded-xl border border-border bg-card p-4 mb-6">
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 className="h-4 w-4 text-primary" />
@@ -235,49 +230,154 @@ const MarketDetail = () => {
             <PriceChart marketId={market.id} yesPrice={market.yes_price} noPrice={market.no_price} />
           </div>
 
+          {/* Regras */}
           <div className="rounded-xl border border-border p-5 mb-6">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-              <Info className="h-4 w-4 text-primary" />
-              Regras do Mercado
+              <Info className="h-4 w-4 text-primary" /> Regras do Mercado
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">{market.resolution_rule}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {(market as any).resolution_rule || "As regras serão definidas pelo administrador do mercado."}
+            </p>
           </div>
         </div>
 
+        {/* ── COLUNA DIREITA: NEGOCIAR ─────────────────────────────────────── */}
         <div className="lg:w-80 flex-shrink-0">
           <div className="rounded-xl border border-border bg-card p-5 sticky top-20 space-y-4">
             <h3 className="text-sm font-bold text-foreground">Negociar</h3>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-success/5 border border-success/20">
-              <div>
-                <p className="text-xs text-muted-foreground">Sim</p>
-                <p className="text-lg font-bold text-success">{yesPct}%</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground">{yesMultiplier}x retorno</p>
-                <p className="text-xs text-muted-foreground">R$ {market.yes_price}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-danger/5 border border-danger/20">
-              <div>
-                <p className="text-xs text-muted-foreground">Não</p>
-                <p className="text-lg font-bold text-danger">{noPct}%</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground">{noMultiplier}x retorno</p>
-                <p className="text-xs text-muted-foreground">R$ {market.no_price}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="success" className="h-12 text-sm font-bold" onClick={() => setDrawerOpen(true)}>
-                Comprar SIM
-              </Button>
-              <Button variant="danger" className="h-12 text-sm font-bold" onClick={() => setDrawerOpen(true)}>
-                Comprar NÃO
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground text-center">
-              Cada contrato paga R$ 1,00 se a posição estiver correta.
-            </p>
+
+            {/* ── MÚLTIPLO: candidatos/opções ── */}
+            {tipoMercado === "multiplo" && (
+              <>
+                <div className="flex flex-col gap-2">
+                  {(opcoes as any[]).map((op) => (
+                    <button
+                      key={op.id}
+                      onClick={() => { setSelectedOpcao(op); setDrawerOpen(true); }}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all text-left
+                        ${selectedOpcao?.id === op.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/40"}`}
+                    >
+                      {op.foto_url ? (
+                        <img src={op.foto_url} alt={op.label}
+                          className="h-12 w-12 rounded-lg object-cover border border-border/40 shrink-0"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      ) : (
+                        <div className="h-12 w-12 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center text-lg font-bold text-primary shrink-0">
+                          {op.label.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{op.label}</p>
+                        {op.descricao && <p className="text-[10px] text-muted-foreground truncate">{op.descricao}</p>}
+                      </div>
+                      <span className="text-sm font-bold text-primary shrink-0">{op.probabilidade}%</span>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  className="w-full h-12 font-bold"
+                  onClick={() => setDrawerOpen(true)}
+                  disabled={!selectedOpcao}
+                >
+                  {selectedOpcao ? `Apostar em ${selectedOpcao.label}` : "Selecione uma opção"}
+                </Button>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Cada contrato paga R$ 1,00 se a posição estiver correta.
+                </p>
+              </>
+            )}
+
+            {/* ── PERÍODO: quando vai acontecer ── */}
+            {tipoMercado === "periodo" && (
+              <>
+                <div className="flex flex-col gap-2">
+                  {(opcoes as any[]).map((op) => {
+                    const maxProb   = Math.max(...(opcoes as any[]).map((o) => Number(o.probabilidade) || 0), 0);
+                    const isLeading = Number(op.probabilidade) === maxProb;
+                    return (
+                      <button
+                        key={op.id}
+                        onClick={() => { setSelectedOpcao(op); setDrawerOpen(true); }}
+                        className={`flex items-center justify-between p-3 rounded-lg border transition-all text-left
+                          ${selectedOpcao?.id === op.id
+                            ? "border-primary bg-primary/10"
+                            : isLeading
+                              ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
+                              : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/40"}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-foreground truncate">{op.label}</p>
+                          {op.descricao && <p className="text-[10px] text-muted-foreground truncate">{op.descricao}</p>}
+                        </div>
+                        {/* mini donut */}
+                        <div className="relative flex-shrink-0 w-10 h-10 ml-3">
+                          <svg viewBox="0 0 36 36" className="w-10 h-10 -rotate-90">
+                            <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" strokeWidth="3" className="text-border/30" />
+                            <circle cx="18" cy="18" r="14" fill="none"
+                              stroke={isLeading ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))"}
+                              strokeWidth="3"
+                              strokeDasharray={`${Number(op.probabilidade) * 0.879} 100`}
+                              strokeLinecap="round" />
+                          </svg>
+                          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-foreground">
+                            {op.probabilidade}%
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  className="w-full h-12 font-bold"
+                  onClick={() => setDrawerOpen(true)}
+                  disabled={!selectedOpcao}
+                >
+                  {selectedOpcao ? `Apostar: ${selectedOpcao.label}` : "Selecione um período"}
+                </Button>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Cada contrato paga R$ 1,00 se a posição estiver correta.
+                </p>
+              </>
+            )}
+
+            {/* ── BINÁRIO: Sim/Não ── */}
+            {(tipoMercado === "binario" || !tipoMercado) && (
+              <>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-success/5 border border-success/20">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Sim</p>
+                    <p className="text-lg font-bold text-success">{yesPct}%</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground">{yesMultiplier}x retorno</p>
+                    <p className="text-xs text-muted-foreground">R$ {market.yes_price}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-danger/5 border border-danger/20">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Não</p>
+                    <p className="text-lg font-bold text-danger">{noPct}%</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground">{noMultiplier}x retorno</p>
+                    <p className="text-xs text-muted-foreground">R$ {market.no_price}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant="success" className="h-12 text-sm font-bold" onClick={() => setDrawerOpen(true)}>
+                    Comprar SIM
+                  </Button>
+                  <Button variant="danger" className="h-12 text-sm font-bold" onClick={() => setDrawerOpen(true)}>
+                    Comprar NÃO
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Cada contrato paga R$ 1,00 se a posição estiver correta.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
