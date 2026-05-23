@@ -14,169 +14,230 @@ export type Database = {
   }
   public: {
     Tables: {
-      markets: {
+      apostas: {
         Row: {
-          category: string
           created_at: string
-          created_by: string | null
-          description: string | null
-          end_date: string
-          external_id: string | null
           id: string
-          image_url: string | null
-          no_price: number
-          resolution_rule: string
+          mercado_id: string
+          mp_payment_id: string | null
+          payout: number | null
+          posicao_id: string | null
+          preco_unitario: number
+          quantidade: number
           status: string
-          title: string
-          updated_at: string
-          volume: number
-          yes_price: number
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          end_date: string
-          external_id?: string | null
-          id?: string
-          image_url?: string | null
-          no_price?: number
-          resolution_rule?: string
-          status?: string
-          title: string
-          updated_at?: string
-          volume?: number
-          yes_price?: number
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          end_date?: string
-          external_id?: string | null
-          id?: string
-          image_url?: string | null
-          no_price?: number
-          resolution_rule?: string
-          status?: string
-          title?: string
-          updated_at?: string
-          volume?: number
-          yes_price?: number
-        }
-        Relationships: []
-      }
-      orders: {
-        Row: {
-          amount: number
-          created_at: string
-          description: string | null
-          id: string
-          status: string
-          stripe_checkout_id: string | null
+          tipo: string
           updated_at: string
           user_id: string
+          valor_total: number
         }
         Insert: {
-          amount?: number
           created_at?: string
-          description?: string | null
           id?: string
+          mercado_id: string
+          mp_payment_id?: string | null
+          payout?: number | null
+          posicao_id?: string | null
+          preco_unitario: number
+          quantidade?: number
           status?: string
-          stripe_checkout_id?: string | null
+          tipo: string
           updated_at?: string
           user_id: string
+          valor_total: number
         }
         Update: {
-          amount?: number
           created_at?: string
-          description?: string | null
           id?: string
+          mercado_id?: string
+          mp_payment_id?: string | null
+          payout?: number | null
+          posicao_id?: string | null
+          preco_unitario?: number
+          quantidade?: number
           status?: string
-          stripe_checkout_id?: string | null
+          tipo?: string
           updated_at?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      platform_fees: {
-        Row: {
-          amount: number
-          created_at: string
-          fee_type: string
-          id: string
-          transaction_id: string | null
-          withdrawal_request_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          fee_type: string
-          id?: string
-          transaction_id?: string | null
-          withdrawal_request_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          fee_type?: string
-          id?: string
-          transaction_id?: string | null
-          withdrawal_request_id?: string | null
+          valor_total?: number
         }
         Relationships: [
           {
-            foreignKeyName: "platform_fees_transaction_id_fkey"
-            columns: ["transaction_id"]
+            foreignKeyName: "apostas_posicao_id_fkey"
+            columns: ["posicao_id"]
             isOneToOne: false
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "platform_fees_withdrawal_request_id_fkey"
-            columns: ["withdrawal_request_id"]
-            isOneToOne: false
-            referencedRelation: "withdrawal_requests"
+            referencedRelation: "posicoes"
             referencedColumns: ["id"]
           },
         ]
       }
-      positions: {
+      carteiras: {
         Row: {
-          avg_price: number
-          created_at: string
+          created_at: string | null
           id: string
-          market_id: string
-          quantity: number
-          side: string
-          updated_at: string
+          saldo: number | null
           user_id: string
         }
         Insert: {
-          avg_price?: number
-          created_at?: string
+          created_at?: string | null
           id?: string
-          market_id: string
-          quantity?: number
-          side: string
-          updated_at?: string
+          saldo?: number | null
           user_id: string
         }
         Update: {
-          avg_price?: number
-          created_at?: string
+          created_at?: string | null
           id?: string
-          market_id?: string
-          quantity?: number
-          side?: string
-          updated_at?: string
+          saldo?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contratos: {
+        Row: {
+          created_at: string | null
+          id: string
+          mp_external_reference: string | null
+          mp_payment_id: string | null
+          posicao_id: string
+          preco_pago: number
+          quantidade: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mp_external_reference?: string | null
+          mp_payment_id?: string | null
+          posicao_id: string
+          preco_pago: number
+          quantidade: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mp_external_reference?: string | null
+          mp_payment_id?: string | null
+          posicao_id?: string
+          preco_pago?: number
+          quantidade?: number
+          status?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "positions_market_id_fkey"
+            foreignKeyName: "contratos_posicao_id_fkey"
+            columns: ["posicao_id"]
+            isOneToOne: false
+            referencedRelation: "posicoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      markets: {
+        Row: {
+          away_image_url: string | null
+          away_logo: string | null
+          category: string | null
+          end_date: string | null
+          event_date: string | null
+          foto_capa: string | null
+          home_logo: string | null
+          id: string
+          image_url: string | null
+          nome: string | null
+          start_date: string | null
+          status: string | null
+          subtitulo: string | null
+          tipo_mercado: string | null
+          volume: number | null
+          volume_away: number | null
+          volume_draw: number | null
+          volume_home: number | null
+          yes_prob: number | null
+        }
+        Insert: {
+          away_image_url?: string | null
+          away_logo?: string | null
+          category?: string | null
+          end_date?: string | null
+          event_date?: string | null
+          foto_capa?: string | null
+          home_logo?: string | null
+          id: string
+          image_url?: string | null
+          nome?: string | null
+          start_date?: string | null
+          status?: string | null
+          subtitulo?: string | null
+          tipo_mercado?: string | null
+          volume?: number | null
+          volume_away?: number | null
+          volume_draw?: number | null
+          volume_home?: number | null
+          yes_prob?: number | null
+        }
+        Update: {
+          away_image_url?: string | null
+          away_logo?: string | null
+          category?: string | null
+          end_date?: string | null
+          event_date?: string | null
+          foto_capa?: string | null
+          home_logo?: string | null
+          id?: string
+          image_url?: string | null
+          nome?: string | null
+          start_date?: string | null
+          status?: string | null
+          subtitulo?: string | null
+          tipo_mercado?: string | null
+          volume?: number | null
+          volume_away?: number | null
+          volume_draw?: number | null
+          volume_home?: number | null
+          yes_prob?: number | null
+        }
+        Relationships: []
+      }
+      opcoes_mercado: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          foto_url: string | null
+          id: string
+          label: string
+          market_id: string | null
+          ordem: number | null
+          probabilidade: number | null
+          volume: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          descricao?: string | null
+          foto_url?: string | null
+          id?: string
+          label: string
+          market_id?: string | null
+          ordem?: number | null
+          probabilidade?: number | null
+          volume?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string | null
+          foto_url?: string | null
+          id?: string
+          label?: string
+          market_id?: string | null
+          ordem?: number | null
+          probabilidade?: number | null
+          volume?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opcoes_mercado_market_id_fkey"
             columns: ["market_id"]
             isOneToOne: false
             referencedRelation: "markets"
@@ -184,131 +245,342 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      payment_history: {
         Row: {
-          balance: number
-          created_at: string
-          email: string | null
+          amount_brl: number | null
+          created_at: string | null
           id: string
-          updated_at: string
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          plan_id: string | null
+          status: string | null
+          user_id: string
         }
         Insert: {
-          balance?: number
-          created_at?: string
-          email?: string | null
-          id: string
-          updated_at?: string
+          amount_brl?: number | null
+          created_at?: string | null
+          id?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          plan_id?: string | null
+          status?: string | null
+          user_id: string
         }
         Update: {
-          balance?: number
-          created_at?: string
-          email?: string | null
+          amount_brl?: number | null
+          created_at?: string | null
           id?: string
-          updated_at?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          plan_id?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_history_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos_pendentes: {
+        Row: {
+          created_at: string | null
+          id: string
+          market_id: string | null
+          plan_id: string | null
+          posicao_id: string | null
+          preference_id: string
+          price_per_contract: number | null
+          quantity: number | null
+          status: string | null
+          tipo: string | null
+          total_cost: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          market_id?: string | null
+          plan_id?: string | null
+          posicao_id?: string | null
+          preference_id: string
+          price_per_contract?: number | null
+          quantity?: number | null
+          status?: string | null
+          tipo?: string | null
+          total_cost: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          market_id?: string | null
+          plan_id?: string | null
+          posicao_id?: string | null
+          preference_id?: string
+          price_per_contract?: number | null
+          quantity?: number | null
+          status?: string | null
+          tipo?: string | null
+          total_cost?: number
+          user_id?: string
         }
         Relationships: []
+      }
+      plans: {
+        Row: {
+          features: Json | null
+          id: string
+          name: string
+          predictions_limit: number
+          price_brl: number
+        }
+        Insert: {
+          features?: Json | null
+          id: string
+          name: string
+          predictions_limit: number
+          price_brl: number
+        }
+        Update: {
+          features?: Json | null
+          id?: string
+          name?: string
+          predictions_limit?: number
+          price_brl?: number
+        }
+        Relationships: []
+      }
+      posicoes: {
+        Row: {
+          id: string
+          mercado_id: string
+          preco_unitario: number
+          tipo: string
+          volume_comprado: number
+          volume_disponivel: number
+          volume_total: number
+        }
+        Insert: {
+          id?: string
+          mercado_id: string
+          preco_unitario?: number
+          tipo: string
+          volume_comprado?: number
+          volume_disponivel?: number
+          volume_total?: number
+        }
+        Update: {
+          id?: string
+          mercado_id?: string
+          preco_unitario?: number
+          tipo?: string
+          volume_comprado?: number
+          volume_disponivel?: number
+          volume_total?: number
+        }
+        Relationships: []
+      }
+      prediction_usage: {
+        Row: {
+          count: number | null
+          id: string
+          month: string
+          user_id: string
+        }
+        Insert: {
+          count?: number | null
+          id?: string
+          month: string
+          user_id: string
+        }
+        Update: {
+          count?: number | null
+          id?: string
+          month?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      price_history: {
+        Row: {
+          id: string
+          market_id: string
+          minute: number
+          prob_away: number | null
+          prob_home: number | null
+          recorded_at: string | null
+          volume: number | null
+        }
+        Insert: {
+          id?: string
+          market_id: string
+          minute: number
+          prob_away?: number | null
+          prob_home?: number | null
+          recorded_at?: string | null
+          volume?: number | null
+        }
+        Update: {
+          id?: string
+          market_id?: string
+          minute?: number
+          prob_away?: number | null
+          prob_home?: number | null
+          recorded_at?: string | null
+          volume?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_history_market_id_fkey"
+            columns: ["market_id"]
+            isOneToOne: false
+            referencedRelation: "markets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saques: {
+        Row: {
+          chave_pix: string
+          created_at: string | null
+          id: string
+          observacao: string | null
+          status: string | null
+          tipo_chave: string
+          updated_at: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          chave_pix: string
+          created_at?: string | null
+          id?: string
+          observacao?: string | null
+          status?: string | null
+          tipo_chave: string
+          updated_at?: string | null
+          user_id: string
+          valor: number
+        }
+        Update: {
+          chave_pix?: string
+          created_at?: string | null
+          id?: string
+          observacao?: string | null
+          status?: string | null
+          tipo_chave?: string
+          updated_at?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          plan_id: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          plan_id?: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          plan_id?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
-          amount: number
-          created_at: string
-          description: string | null
+          created_at: string | null
           id: string
-          market_id: string | null
-          price_per_contract: number | null
-          quantity: number | null
-          side: string | null
-          type: string
-          user_id: string
+          mp_payment_id: string | null
+          status: string | null
+          tipo: string
+          user_id: string | null
+          valor: number
         }
         Insert: {
-          amount: number
-          created_at?: string
-          description?: string | null
+          created_at?: string | null
           id?: string
-          market_id?: string | null
-          price_per_contract?: number | null
-          quantity?: number | null
-          side?: string | null
-          type: string
-          user_id: string
+          mp_payment_id?: string | null
+          status?: string | null
+          tipo: string
+          user_id?: string | null
+          valor: number
         }
         Update: {
-          amount?: number
-          created_at?: string
-          description?: string | null
+          created_at?: string | null
           id?: string
-          market_id?: string | null
-          price_per_contract?: number | null
-          quantity?: number | null
-          side?: string | null
-          type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "transactions_market_id_fkey"
-            columns: ["market_id"]
-            isOneToOne: false
-            referencedRelation: "markets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_roles: {
-        Row: {
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
+          mp_payment_id?: string | null
+          status?: string | null
+          tipo?: string
+          user_id?: string | null
+          valor?: number
         }
         Relationships: []
       }
-      withdrawal_requests: {
+      wallets: {
         Row: {
-          amount: number
-          created_at: string
-          fee: number
+          created_at: string | null
           id: string
-          net_amount: number
-          pix_key: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          user_id: string
+          saldo: number | null
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          amount: number
-          created_at?: string
-          fee?: number
+          created_at?: string | null
           id?: string
-          net_amount: number
-          pix_key: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          user_id: string
+          saldo?: number | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          amount?: number
-          created_at?: string
-          fee?: number
+          created_at?: string | null
           id?: string
-          net_amount?: number
-          pix_key?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          user_id?: string
+          saldo?: number | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -317,16 +589,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
+      auto_resolver_mercados: { Args: never; Returns: undefined }
+      creditar_saldo: {
+        Args: { p_user_id: string; p_valor: number }
+        Returns: undefined
+      }
+      debitar_saldo: {
+        Args: { p_user_id: string; p_valor: number }
+        Returns: undefined
+      }
+      increment_prediction_usage: { Args: { p_user_id: string }; Returns: Json }
+      incrementar_volume_comprado: {
+        Args: { p_posicao_id: string; p_quantidade: number }
+        Returns: undefined
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -453,8 +732,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["admin", "user"],
-    },
+    Enums: {},
   },
 } as const
