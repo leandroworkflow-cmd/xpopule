@@ -241,7 +241,7 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
                 <img
                   src={op.foto_url}
                   alt={op.label}
-                  className="h-12 w-12 rounded-full object-cover border-2 border-border/40 shrink-0"
+                  className="h-12 w-12 rounded-lg object-cover border-2 border-border/40 shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = "none";
@@ -252,7 +252,7 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
               ) : null}
               {/* Fallback com inicial */}
               <div
-                className="h-12 w-12 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0"
+                className="h-12 w-12 rounded-lg bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0"
                 style={{ display: op.foto_url ? "none" : "flex" }}
               >
                 {op.label.slice(0, 1).toUpperCase()}
