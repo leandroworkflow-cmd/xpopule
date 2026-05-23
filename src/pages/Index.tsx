@@ -233,16 +233,38 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
           {dateLabel && <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{dateLabel}</span>}
         </div>
         <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{title}</p>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           {(opcoes as any[]).slice(0, 3).map((op) => (
-            <div key={op.id} className="flex items-center gap-2 py-1.5 border-t border-border/30 first:border-0 first:pt-0">
-              {op.foto_url && (
-                <img src={op.foto_url} alt={op.label} className="h-6 w-6 rounded-full object-cover border border-border/40 shrink-0"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-              )}
-              <span className="text-xs text-foreground flex-1 truncate">{op.label}</span>
-              <button onClick={(e) => { e.stopPropagation(); onSelect(market); }}
-                className="text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-lg hover:bg-primary/20 transition-colors shrink-0">
+            <div key={op.id} className="flex items-center gap-3 py-2 px-2 rounded-lg bg-muted/20 border border-border/30 hover:border-primary/30 transition-all">
+              {/* Foto do candidato com fallback */}
+              {op.foto_url ? (
+                <img
+                  src={op.foto_url}
+                  alt={op.label}
+                  className="h-12 w-12 rounded-full object-cover border-2 border-border/40 shrink-0"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = "none";
+                    const sibling = target.nextElementSibling as HTMLElement;
+                    if (sibling) sibling.style.display = "flex";
+                  }}
+                />
+              ) : null}
+              {/* Fallback com inicial */}
+              <div
+                className="h-12 w-12 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0"
+                style={{ display: op.foto_url ? "none" : "flex" }}
+              >
+                {op.label.slice(0, 1).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{op.label}</p>
+                {op.descricao && <p className="text-[10px] text-muted-foreground truncate">{op.descricao}</p>}
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onSelect(market); }}
+                className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors shrink-0"
+              >
                 {op.probabilidade}%
               </button>
             </div>
