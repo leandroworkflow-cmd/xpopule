@@ -236,6 +236,203 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
   );
 }
 
+// ── OtherSportsFeaturedCard: Basquete, MMA, Vôlei, Tênis ────────────────────────
+const SPORT_ICONS: Record<string, string> = {
+  basquete: "🏀",
+  luta:     "🥊",
+  volei:    "🏐",
+  tenis:    "🎾",
+};
+
+const SPORT_COLORS: Record<string, string> = {
+  basquete: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+  luta:     "text-red-400 bg-red-500/10 border-red-500/20",
+  volei:    "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+  tenis:    "text-lime-400 bg-lime-500/10 border-lime-500/20",
+};
+
+function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
+  const [idx, setIdx] = useState(0);
+  const navigate = useNavigate();
+  useEffect(() => setIdx(0), [markets]);
+  if (!markets.length) return null;
+
+  const featured   = markets[idx];
+  const title      = (featured as any).nome || featured.title || "";
+  const category   = featured.category || "";
+  const icon       = SPORT_ICONS[category] || "🏆";
+  const colorCls   = SPORT_COLORS[category] || "text-violet-400 bg-violet-500/10 border-violet-500/20";
+  const endDateObj = new Date((featured as any).end_date || "");
+  const now        = new Date();
+  const isToday    = endDateObj.toDateString() === now.toDateString();
+  const isLive     = endDateObj <= now && now <= new Date(endDateObj.getTime() + 3 * 60 * 60 * 1000);
+  const dateLabel  = endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  const timeLabel  = endDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const homeLogo = (featured as any).home_logo || null;
+  const awayLogo = (featured as any).away_logo || null;
+  const parts    = title.split(/ x | vs /i);
+  const teamA    = parts[0]?.trim() || "Time A";
+  const teamB    = parts[1]?.trim() || "Time B";
+
+  const { data: posHome } = useMarketPosicoes ? { data: [] } : { data: [] };
+  const yesProb = Math.round(((featured as any).yes_prob ?? 50));
+  const noProb  = 100 - yesProb;
+  const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
+  const noOdds  = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
+
+  return (
+    <div className={`rounded-2xl border bg-card overflow-hidden ${isLive ? "border-red-500/50" : "border-violet-500/20"}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/40">
+        <div className="flex items-center gap-2 flex-wrap">
+          {isLive ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-400 bg-red-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-red-500/30">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+              </span>
+              AO VIVO
+            </span>
+          ) : isToday ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-orange-400 bg-orange-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-orange-500/30">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+              </span>
+              HOJE
+            </span>
+          ) : null}
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${colorCls}`}>
+            {icon} {category.charAt(0).toUpperCase() + category.slice(1)}
+          </span>
+          <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1 rounded-full">
+            📅 {dateLabel} · ⏰ {timeLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIdx((i) => (i - 1 + markets.length) % markets.length)}
+            className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors">
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-xs text-muted-foreground min-w-[50px] text-center">{idx + 1} de {markets.length}</span>
+          <button onClick={() => setIdx((i) => (i + 1) % markets.length)}
+            className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors">
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Título */}
+      <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
+        <h2 className="text-xl font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
+      </div>
+
+      {/* Layout Kalshi: probabilidades esquerda + times/logos direita */}
+      <div className="flex items-stretch border-t border-border/30">
+
+        {/* ESQUERDA: probabilidades */}
+        <div className="flex flex-col justify-between px-5 py-4 w-[340px] shrink-0">
+          <div className="flex items-center text-xs text-muted-foreground mb-3">
+            <span className="flex-1">Mercado</span>
+            <span className="w-14 text-center mr-3">Paga fora</span>
+            <span className="w-16 text-center">Probabilidades</span>
+          </div>
+
+          {/* Time A */}
+          <div className="flex items-center py-2.5">
+            <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
+              {homeLogo
+                ? <img src={homeLogo} alt={teamA} className="h-8 w-8 rounded-lg object-contain bg-muted shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamA.slice(0,2).toUpperCase()}</div>
+              }
+              <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
+            </div>
+            <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
+            <button onClick={() => onSelect(featured)}
+              className="w-16 h-9 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
+              {yesProb}%
+            </button>
+          </div>
+
+          {/* Time B */}
+          <div className="flex items-center py-2.5 border-t border-border/30">
+            <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
+              {awayLogo
+                ? <img src={awayLogo} alt={teamB} className="h-8 w-8 rounded-lg object-contain bg-muted shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamB.slice(0,2).toUpperCase()}</div>
+              }
+              <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
+            </div>
+            <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
+            <button onClick={() => onSelect(featured)}
+              className="w-16 h-9 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
+              {noProb}%
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
+            <span>{fmtVol((featured as any).volume || 0)} vol</span>
+            <span>Espalhe e Total</span>
+          </div>
+        </div>
+
+        {/* DIREITA: próximos jogos da modalidade */}
+        <div className="flex-1 border-l border-border/30 min-w-0 p-4">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Próximos jogos</p>
+          <div className="flex flex-col gap-2">
+            {markets.slice(0, 5).map((m, i) => {
+              const t    = (m as any).nome || m.title || "";
+              const d    = new Date((m as any).end_date || "");
+              const dl   = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+              const tl   = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+              const cat  = m.category || "";
+              const ico  = SPORT_ICONS[cat] || "🏆";
+              const isCurrent = i === idx;
+              return (
+                <div key={m.id}
+                  onClick={() => setIdx(i)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all
+                    ${isCurrent ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/40 border border-transparent"}`}>
+                  <span className="text-base shrink-0">{ico}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-medium truncate ${isCurrent ? "text-primary" : "text-foreground"}`}>{t}</p>
+                    <p className="text-[10px] text-muted-foreground">{dl} · {tl}</p>
+                  </div>
+                  {isCurrent && <span className="text-[9px] font-bold text-primary shrink-0">● ativo</span>}
+                </div>
+              );
+            })}
+            {markets.length > 5 && (
+              <p className="text-[10px] text-muted-foreground text-center pt-1">+{markets.length - 5} jogos</p>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
+        {[
+          { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
+          { icon: "🛡️", title: "Negociação Responsável",     sub: "Ferramentas e dicas para negociar de forma inteligente" },
+          { icon: "🔍", title: "Integridade Mercadológica",  sub: "Saiba como o Kalshi impede o insider trading" },
+        ].map((p) => (
+          <div key={p.title} className="flex items-start gap-2 px-4 py-3 hover:bg-accent/30 cursor-pointer transition-colors">
+            <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-sm shrink-0 mt-0.5">{p.icon}</div>
+            <div>
+              <div className="text-[11px] font-semibold text-foreground leading-tight">{p.title}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{p.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── CategoryMiniCard: suporta binario, multiplo e periodo ─────────────────────
 function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m: DBMarket) => void }) {
   const navigate    = useNavigate();
@@ -478,6 +675,23 @@ const Index = () => {
   const activeMarkets   = useMemo(() => { if (!allMarkets) return []; return filterActive(allMarkets); }, [allMarkets]);
   const sportsMarkets   = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
   const otherCategories = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
+
+  // Outras modalidades: basquete, luta, volei, tenis — próximos 3 dias
+  const otherSportsMarkets = useMemo(() => {
+    const now    = new Date();
+    const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    return activeMarkets
+      .filter((m) => ["basquete", "luta", "volei", "tenis"].includes(m.category))
+      .filter((m) => {
+        const d = new Date((m as any).end_date || (m as any).event_date || "");
+        return !isNaN(d.getTime()) && d >= now && d <= limite;
+      })
+      .sort((a, b) => {
+        const da = new Date((a as any).end_date || "").getTime();
+        const db = new Date((b as any).end_date || "").getTime();
+        return da - db;
+      });
+  }, [activeMarkets]);
   const displayMarkets  = useMemo(() => {
     let base = activeMarkets;
     if (activeCategory !== "todos") base = base.filter((m) => m.category === activeCategory);
@@ -525,6 +739,20 @@ const Index = () => {
               ) : <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
             ) : (
               <div className="flex flex-col gap-8">
+                {/* ── OUTRAS MODALIDADES: Basquete, MMA, Vôlei, Tênis ── */}
+                {otherSportsMarkets.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Trophy className="h-4 w-4 text-violet-400" />
+                      <h2 className="text-base font-bold text-foreground">Outras Modalidades</h2>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{otherSportsMarkets.length}</span>
+                      <span className="text-[10px] text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full ml-1">próximos 3 dias</span>
+                    </div>
+                    <OtherSportsFeaturedCard markets={otherSportsMarkets} onSelect={setSelectedMarket} />
+                  </div>
+                )}
+
+                {/* ── FUTEBOL ── */}
                 {sportsMarkets.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
