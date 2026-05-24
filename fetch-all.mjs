@@ -5,6 +5,9 @@ const SUPABASE_URL  = "https://odexmyskaespjusivjua.supabase.co";
 const SUPABASE_KEY  = "sb_publishable_s9oIKQj9UXCPucjw1cmzlw_N3HqxH-Y";
 const BDL_KEY       = "ee89e01a-4107-4947-a427-f508cb69fd7f";
 
+const FOOTBALL_DAYS = 7;   // futebol: próximos 7 dias
+const OUTROS_DAYS   = 14;  // outros esportes: próximos 14 dias
+
 // ── FUTEBOL CONFIG ────────────────────────────────────────────────────────────
 
 const COMPETICOES = [
@@ -42,33 +45,36 @@ function getDateRange(daysAhead) {
   };
 }
 
-const hoje = new Date();
-hoje.setHours(0, 0, 0, 0);
-
 // ── FUTEBOL (football-data.org) ───────────────────────────────────────────────
+// CORREÇÃO: usa dateFrom/dateTo para buscar só os próximos FOOTBALL_DAYS dias
 
 async function fetchJogos(comp) {
-  console.log("  Buscando " + comp.nome + "...");
-  const res = await fetch(
-    "https://api.football-data.org/v4/competitions/" + comp.code + "/matches?status=SCHEDULED",
-    { headers: { "X-Auth-Token": FOOTBALL_KEY } }
-  );
-  if (!res.ok) { console.warn("  Erro " + res.status + " para " + comp.nome); return []; }
+  process.stdout.write("  Buscando " + comp.nome + "... ");
+  const { start, end } = getDateRange(FOOTBALL_DAYS);
+  const url = "https://api.football-data.org/v4/competitions/" + comp.code +
+    "/matches?status=SCHEDULED&dateFrom=" + start + "&dateTo=" + end;
+
+  const res = await fetch(url, { headers: { "X-Auth-Token": FOOTBALL_KEY } });
+  if (!res.ok) { console.log("Erro " + res.status); return []; }
   const data = await res.json();
-  const jogos = (data.matches || []).filter(j => new Date(j.utcDate) > hoje);
-  console.log("  " + jogos.length + " jogos futuros.");
+  if (data.errorCode) { console.log("sem acesso."); return []; }
+
+  const jogos = data.matches || [];
+  console.log(jogos.length + " jogos (próximos " + FOOTBALL_DAYS + " dias).");
+
   return jogos.map(j => {
-    const home     = traduzir(j.homeTeam.name);
-    const away     = traduzir(j.awayTeam.name);
+    const home     = traduzir(j.homeTeam.shortName || j.homeTeam.name);
+    const away     = traduzir(j.awayTeam.shortName || j.awayTeam.name);
     const dataJogo = new Date(j.utcDate);
-    const endDate  = new Date(dataJogo.getTime() - 60 * 60 * 1000);
     return {
       id:         "jogo_fd_" + j.id,
-      nome:       home + " x " + away,
-      end_date:   endDate.toISOString().split("T")[0],
+      nome:       home + " X " + away,
+      end_date:   dataJogo.toISOString(),
       event_date: dataJogo.toISOString(),
       home_logo:  j.homeTeam.crest || null,
       away_logo:  j.awayTeam.crest || null,
+      image_url:  j.homeTeam.crest || null,
+      away_image_url: j.awayTeam.crest || null,
       status:     "active",
       category:   "esportes",
       volume:     0,
@@ -81,7 +87,7 @@ async function fetchJogos(comp) {
 
 async function fetchNBA() {
   process.stdout.write("  Buscando NBA... ");
-  const { start, end } = getDateRange(7);
+  const { start, end } = getDateRange(OUTROS_DAYS);
   const url = "https://api.balldontlie.io/v1/games"
     + "?start_date=" + start
     + "&end_date=" + end
@@ -100,11 +106,10 @@ async function fetchNBA() {
     const home     = g.home_team.full_name;
     const away     = g.visitor_team.full_name;
     const dataJogo = new Date(g.datetime || g.date);
-    const endDate  = new Date(dataJogo.getTime() - 60 * 60 * 1000);
     return {
       id:         "nba_" + g.id,
-      nome:       home + " x " + away,
-      end_date:   endDate.toISOString().split("T")[0],
+      nome:       home + " X " + away,
+      end_date:   dataJogo.toISOString(),
       event_date: g.datetime || g.date + "T00:00:00Z",
       home_logo:  null,
       away_logo:  null,
@@ -126,21 +131,23 @@ async function fetchMMA() {
   const res = await fetch(url, { headers: { Authorization: BDL_KEY } });
   if (!res.ok) { console.log("Erro " + res.status); return []; }
   const data = await res.json();
-  const agora = new Date();
+  const agora  = new Date();
+  const limite = new Date();
+  limite.setDate(limite.getDate() + OUTROS_DAYS);
 
   const eventos = (data.data || []).filter(e => {
     const s = (e.status || "").toLowerCase();
-    return s === "scheduled" && new Date(e.date) > agora;
+    const d = new Date(e.date);
+    return s === "scheduled" && d > agora && d <= limite;
   });
 
   console.log(eventos.length + " eventos.");
   return eventos.slice(0, 10).map(e => {
     const dataEvento = new Date(e.date);
-    const endDate    = new Date(dataEvento.getTime() - 60 * 60 * 1000);
     return {
       id:         "mma_" + e.id,
       nome:       e.name,
-      end_date:   endDate.toISOString().split("T")[0],
+      end_date:   dataEvento.toISOString(),
       event_date: dataEvento.toISOString(),
       home_logo:  null,
       away_logo:  null,
@@ -152,11 +159,11 @@ async function fetchMMA() {
   });
 }
 
-// ── TÊNIS ATP (balldontlie.io) ────────────────────────────────────────────────
+// ── TÊNIS ATP/WTA (balldontlie.io) ────────────────────────────────────────────
 
 async function fetchTenis() {
   process.stdout.write("  Buscando Tenis (ATP/WTA)... ");
-  const { start, end } = getDateRange(14);
+  const { start, end } = getDateRange(OUTROS_DAYS);
 
   const [resATP, resWTA] = await Promise.all([
     fetch("https://api.balldontlie.io/atp/v1/matches?start_date=" + start + "&end_date=" + end + "&per_page=25",
@@ -179,11 +186,10 @@ async function fetchTenis() {
     const p1       = m.player1?.full_name || m.home?.name || "Atleta 1";
     const p2       = m.player2?.full_name || m.away?.name || "Atleta 2";
     const dataJogo = new Date(m.datetime || m.date || start);
-    const endDate  = new Date(dataJogo.getTime() - 60 * 60 * 1000);
     return {
       id:         "tenis_" + m.id,
-      nome:       p1 + " x " + p2,
-      end_date:   endDate.toISOString().split("T")[0],
+      nome:       p1 + " X " + p2,
+      end_date:   dataJogo.toISOString(),
       event_date: dataJogo.toISOString(),
       home_logo:  null,
       away_logo:  null,
@@ -215,7 +221,7 @@ async function salvar(markets) {
     });
     if (!res.ok) { const e = await res.text(); console.error("Erro lote " + i + ": " + e); }
   }
-  console.log("Salvo!");
+  console.log("✓ Salvo com sucesso!");
 }
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -224,13 +230,13 @@ async function salvar(markets) {
   console.log("=== Importador Unificado de Esportes ===");
   const todos = [];
 
-  console.log("\n[Futebol — football-data.org]");
+  console.log("\n[Futebol — football-data.org] próximos " + FOOTBALL_DAYS + " dias");
   for (const comp of COMPETICOES) {
     todos.push(...await fetchJogos(comp));
     await sleep(1000);
   }
 
-  console.log("\n[Outros Esportes — balldontlie.io]");
+  console.log("\n[Outros Esportes — balldontlie.io] próximos " + OUTROS_DAYS + " dias");
   todos.push(...await fetchNBA());
   await sleep(500);
   todos.push(...await fetchMMA());
@@ -240,5 +246,5 @@ async function salvar(markets) {
   const unicos = Object.values(Object.fromEntries(todos.map(j => [j.id, j])));
   console.log("\nTotal: " + unicos.length + " eventos.");
   await salvar(unicos);
-  console.log("Feito!");
+  console.log("\nFeito!");
 })();
