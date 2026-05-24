@@ -172,21 +172,21 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
       </div>
       {/* Título */}
       <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
-        <h2 className="text-xl font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
+        <h2 className="text-lg font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
 
       {/* ── LAYOUT KALSHI: probabilidades esquerda + gráfico direita ── */}
       <div className="flex items-stretch border-t border-border/30">
 
         {/* ESQUERDA: probabilidades */}
-        <div className="flex flex-col justify-between px-5 py-4 w-[340px] shrink-0">
+        <div className="flex flex-col justify-between px-4 py-3 w-[300px] shrink-0">
           <div className="flex items-center text-xs text-muted-foreground mb-3">
             <span className="flex-1">Mercado</span>
             <span className="w-14 text-center mr-3">Paga fora</span>
             <span className="w-16 text-center">Probabilidades</span>
           </div>
 
-          <div className="flex items-center py-2.5">
+          <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               {homeLogo
                 ? <img src={homeLogo} alt={labelA} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
@@ -194,10 +194,10 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
               <span className="text-sm font-medium text-foreground truncate">{labelA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-9 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
           </div>
 
-          <div className="flex items-center py-2.5 border-t border-border/30">
+          <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               {awayLogo
                 ? <img src={awayLogo} alt={labelB} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
@@ -205,7 +205,7 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{labelB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-9 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
@@ -226,9 +226,9 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           { icon: "🛡️", title: "Negociação Responsável",     sub: "Ferramentas e dicas para negociar de forma inteligente" },
           { icon: "🔍", title: "Integridade Mercadológica",  sub: "Saiba como o Kalshi impede o insider trading" },
         ].map((p) => (
-          <div key={p.title} className="flex items-start gap-2 px-4 py-3 hover:bg-accent/30 cursor-pointer transition-colors">
-            <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-sm shrink-0 mt-0.5">{p.icon}</div>
-            <div><div className="text-[11px] font-semibold text-foreground leading-tight">{p.title}</div><div className="text-[10px] text-muted-foreground mt-0.5">{p.sub}</div></div>
+          <div key={p.title} className="flex items-start gap-2 px-4 py-3 hover:bg-yellow-500/5 cursor-pointer transition-colors">
+            <div className="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-sm shrink-0 mt-0.5">{p.icon}</div>
+            <div><div className="text-[11px] font-semibold text-yellow-400 leading-tight">{p.title}</div><div className="text-[10px] text-muted-foreground mt-0.5">{p.sub}</div></div>
           </div>
         ))}
       </div>
@@ -325,14 +325,14 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
 
       {/* Título */}
       <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
-        <h2 className="text-xl font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
+        <h2 className="text-lg font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
 
       {/* Layout Kalshi: probabilidades esquerda + times/logos direita */}
       <div className="flex items-stretch border-t border-border/30">
 
         {/* ESQUERDA: probabilidades */}
-        <div className="flex flex-col justify-between px-5 py-4 w-[340px] shrink-0">
+        <div className="flex flex-col justify-between px-4 py-3 w-[300px] shrink-0">
           <div className="flex items-center text-xs text-muted-foreground mb-3">
             <span className="flex-1">Mercado</span>
             <span className="w-14 text-center mr-3">Paga fora</span>
@@ -340,35 +340,51 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           </div>
 
           {/* Time A */}
-          <div className="flex items-center py-2.5">
+          <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               {homeLogo
                 ? <img src={homeLogo} alt={teamA} className="h-8 w-8 rounded-lg object-contain bg-muted shrink-0"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamA.slice(0,2).toUpperCase()}</div>
+                : category === "basquete"
+                  ? <div className="h-8 w-8 rounded-lg bg-purple-900 flex items-center justify-center shrink-0 overflow-hidden border border-purple-500/30">
+                      <svg viewBox="0 0 100 100" className="h-7 w-7">
+                        <rect width="100" height="100" fill="#4c1d95"/>
+                        <ellipse cx="50" cy="50" rx="28" ry="28" fill="#7c3aed" opacity="0.3"/>
+                        <text x="50" y="58" textAnchor="middle" fontSize="28" fontWeight="bold" fill="white" fontFamily="Arial">NBA</text>
+                      </svg>
+                    </div>
+                  : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamA.slice(0,2).toUpperCase()}</div>
               }
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
             <button onClick={() => onSelect(featured)}
-              className="w-16 h-9 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
+              className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
               {yesProb}%
             </button>
           </div>
 
           {/* Time B */}
-          <div className="flex items-center py-2.5 border-t border-border/30">
+          <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               {awayLogo
                 ? <img src={awayLogo} alt={teamB} className="h-8 w-8 rounded-lg object-contain bg-muted shrink-0"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamB.slice(0,2).toUpperCase()}</div>
+                : category === "basquete"
+                  ? <div className="h-8 w-8 rounded-lg bg-blue-900 flex items-center justify-center shrink-0 overflow-hidden border border-blue-500/30">
+                      <svg viewBox="0 0 100 100" className="h-7 w-7">
+                        <rect width="100" height="50" fill="#1e3a8a"/>
+                        <rect y="50" width="100" height="50" fill="#991b1b"/>
+                        <text x="50" y="58" textAnchor="middle" fontSize="28" fontWeight="bold" fill="white" fontFamily="Arial">NBA</text>
+                      </svg>
+                    </div>
+                  : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamB.slice(0,2).toUpperCase()}</div>
               }
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
             <button onClick={() => onSelect(featured)}
-              className="w-16 h-9 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
+              className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
               {noProb}%
             </button>
           </div>
@@ -413,17 +429,17 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
 
       </div>
 
-      {/* Footer */}
+      {/* Footer amarelo */}
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
           { icon: "🛡️", title: "Negociação Responsável",     sub: "Ferramentas e dicas para negociar de forma inteligente" },
           { icon: "🔍", title: "Integridade Mercadológica",  sub: "Saiba como o Kalshi impede o insider trading" },
         ].map((p) => (
-          <div key={p.title} className="flex items-start gap-2 px-4 py-3 hover:bg-accent/30 cursor-pointer transition-colors">
-            <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-sm shrink-0 mt-0.5">{p.icon}</div>
+          <div key={p.title} className="flex items-start gap-2 px-4 py-3 hover:bg-yellow-500/5 cursor-pointer transition-colors">
+            <div className="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-sm shrink-0 mt-0.5">{p.icon}</div>
             <div>
-              <div className="text-[11px] font-semibold text-foreground leading-tight">{p.title}</div>
+              <div className="text-[11px] font-semibold text-yellow-400 leading-tight">{p.title}</div>
               <div className="text-[10px] text-muted-foreground mt-0.5">{p.sub}</div>
             </div>
           </div>
