@@ -262,12 +262,14 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const category   = featured.category || "";
   const icon       = SPORT_ICONS[category] || "🏆";
   const colorCls   = SPORT_COLORS[category] || "text-violet-400 bg-violet-500/10 border-violet-500/20";
-  const endDateObj = new Date((featured as any).end_date || "");
+  // Usa event_date se disponível (hora real do jogo), fallback para end_date
+  const eventDate  = (featured as any).event_date || (featured as any).end_date || "";
+  const endDateObj = new Date(eventDate);
   const now        = new Date();
   const isToday    = endDateObj.toDateString() === now.toDateString();
-  const isLive     = endDateObj <= now && now <= new Date(endDateObj.getTime() + 3 * 60 * 60 * 1000);
-  const dateLabel  = endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-  const timeLabel  = endDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const isLive     = !isNaN(endDateObj.getTime()) && endDateObj <= now && now <= new Date(endDateObj.getTime() + 3 * 60 * 60 * 1000);
+  const dateLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+  const timeLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
 
   const homeLogo = (featured as any).home_logo || null;
   const awayLogo = (featured as any).away_logo || null;
