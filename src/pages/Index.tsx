@@ -170,32 +170,56 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           <button onClick={() => setIdx((i) => (i + 1) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
         </div>
       </div>
-      <div className="px-5 pt-4 pb-1 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
+      {/* Título */}
+      <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
         <h2 className="text-xl font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
-      <div className="px-5 py-3">
-        <div className="flex items-center text-xs text-muted-foreground mb-2"><span className="flex-1">Mercado</span><span className="w-14 text-center mr-3">Paga fora</span><span className="w-16 text-center">Probabilidades</span></div>
-        <div className="flex items-center py-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-            {homeLogo ? <img src={homeLogo} alt={labelA} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelA.slice(0, 2).toUpperCase()}</div>}
-            <span className="text-sm font-medium text-foreground truncate">{labelA}</span>
+
+      {/* ── LAYOUT KALSHI: probabilidades esquerda + gráfico direita ── */}
+      <div className="flex items-stretch border-t border-border/30">
+
+        {/* ESQUERDA: probabilidades */}
+        <div className="flex flex-col justify-between px-5 py-4 w-[340px] shrink-0">
+          <div className="flex items-center text-xs text-muted-foreground mb-3">
+            <span className="flex-1">Mercado</span>
+            <span className="w-14 text-center mr-3">Paga fora</span>
+            <span className="w-16 text-center">Probabilidades</span>
           </div>
-          <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-          <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
-        </div>
-        <div className="flex items-center py-2 border-t border-border/30">
-          <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-            {awayLogo ? <img src={awayLogo} alt={labelB} className="h-7 w-7 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelB.slice(0, 2).toUpperCase()}</div>}
-            <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{labelB}</span>
+
+          <div className="flex items-center py-2.5">
+            <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
+              {homeLogo
+                ? <img src={homeLogo} alt={labelA} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelA.slice(0, 2).toUpperCase()}</div>}
+              <span className="text-sm font-medium text-foreground truncate">{labelA}</span>
+            </div>
+            <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
+            <button onClick={() => onSelect(featured)} className="w-16 h-9 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
           </div>
-          <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-          <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
+
+          <div className="flex items-center py-2.5 border-t border-border/30">
+            <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
+              {awayLogo
+                ? <img src={awayLogo} alt={labelB} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelB.slice(0, 2).toUpperCase()}</div>}
+              <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{labelB}</span>
+            </div>
+            <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
+            <button onClick={() => onSelect(featured)} className="w-16 h-9 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
+            <span>{fmtVol(featured.volume || 0)} vol</span>
+            <span>Espalhe e Total</span>
+          </div>
         </div>
+
+        {/* DIREITA: gráfico */}
+        <div className="flex-1 border-l border-border/30 min-w-0">
+          <PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} />
+        </div>
+
       </div>
-      <div className="px-5 pb-1 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{fmtVol(featured.volume || 0)} vol</span><span>Espalhe e Total</span>
-      </div>
-      <div className="border-t border-border/30 mt-2"><PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} /></div>
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
