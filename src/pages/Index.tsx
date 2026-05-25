@@ -329,11 +329,9 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           {/* AJUSTE 02: Time A — sempre silhueta azul */}
           <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              <img
-                src="/silhueta1.png"
-                alt={teamA}
-                className="h-14 w-14 rounded-lg object-contain bg-blue-950 shrink-0 border border-blue-500/30"
-              />
+              <div className="shrink-0 h-16 w-11 rounded-xl bg-blue-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
+                <img src="/silhueta1.png" alt={teamA} className="h-full w-full object-cover" />
+              </div>
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
@@ -346,11 +344,9 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           {/* AJUSTE 02: Time B — sempre silhueta roxa */}
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              <img
-                src="/silhueta2.png"
-                alt={teamB}
-                className="h-14 w-14 rounded-lg object-contain bg-purple-950 shrink-0 border border-purple-500/30"
-              />
+              <div className="shrink-0 h-16 w-11 rounded-xl bg-purple-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
+                <img src="/silhueta2.png" alt={teamB} className="h-full w-full object-cover" />
+              </div>
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
@@ -612,13 +608,33 @@ function UFCSidebarCard() {
   const prob    = (ufcMarket as any).yes_prob ?? 50;
   return (
     <div className="rounded-xl border border-red-500/30 bg-card overflow-hidden">
+      {/* Header */}
       <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/40 bg-red-500/5">
         <span className="text-sm">🥊</span>
         <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Próximo UFC</span>
         <span className="ml-auto text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-full">Em breve</span>
       </div>
-      <div className="px-4 py-3 flex flex-col gap-2">
-        <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug">{title}</p>
+
+      {/* Silhuetas dos lutadores */}
+      <div className="flex items-center justify-center gap-3 px-4 pt-3 pb-1">
+        <div className="flex flex-col items-center gap-1">
+          <div className="h-14 w-10 rounded-xl bg-red-950 border-2 border-white/80 overflow-hidden shadow-md">
+            <img src="/silhueta1.png" alt="Lutador A" className="h-full w-full object-cover" />
+          </div>
+          <span className="text-[9px] text-muted-foreground">Lutador A</span>
+        </div>
+        <span className="text-xs font-black text-red-400">VS</span>
+        <div className="flex flex-col items-center gap-1">
+          <div className="h-14 w-10 rounded-xl bg-red-900 border-2 border-white/80 overflow-hidden shadow-md">
+            <img src="/silhueta2.png" alt="Lutador B" className="h-full w-full object-cover" />
+          </div>
+          <span className="text-[9px] text-muted-foreground">Lutador B</span>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="px-4 py-2 flex flex-col gap-2">
+        <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug text-center">{title}</p>
         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
           <span>📅 {dateStr}</span>
           <span>⏰ {timeStr}</span>
