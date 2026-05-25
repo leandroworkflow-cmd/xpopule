@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { extractTeamsFromTitle } from "@/lib/teamLogos";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { UFCFloatingCard } from "@/components/UFCFloatingCard";
 
 const CATEGORIES = [
   { key: "esportes",       label: "Esportiva",   icon: Trophy,       color: "text-orange-400" },
@@ -333,7 +332,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <img
                 src="/silhueta1.png"
                 alt={teamA}
-                className="h-8 w-8 rounded-lg object-contain bg-blue-950 shrink-0 border border-blue-500/30"
+                className="h-14 w-14 rounded-lg object-contain bg-blue-950 shrink-0 border border-blue-500/30"
               />
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
@@ -350,7 +349,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <img
                 src="/silhueta2.png"
                 alt={teamB}
-                className="h-8 w-8 rounded-lg object-contain bg-purple-950 shrink-0 border border-purple-500/30"
+                className="h-14 w-14 rounded-lg object-contain bg-purple-950 shrink-0 border border-purple-500/30"
               />
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
@@ -586,11 +585,67 @@ function CategoryGrid({ cat, onSelect }: { cat: { key: string; label: string; ic
   );
 }
 
+function UFCSidebarCard() {
+  const navigate = useNavigate();
+  const { data: ufcMarket } = useQuery({
+    queryKey: ["ufc_next_sidebar"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("markets")
+        .select("id, nome, end_date, yes_prob")
+        .eq("category", "luta")
+        .eq("status", "active")
+        .order("end_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  if (!ufcMarket) return null;
+  const title   = (ufcMarket as any).nome || "";
+  const rawDate = (ufcMarket as any).end_date;
+  const endDate = rawDate ? new Date(rawDate) : null;
+  const isValid = endDate && !isNaN(endDate.getTime());
+  const dateStr = isValid ? endDate!.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+  const timeStr = isValid ? endDate!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+  const prob    = (ufcMarket as any).yes_prob ?? 50;
+  return (
+    <div className="rounded-xl border border-red-500/30 bg-card overflow-hidden">
+      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/40 bg-red-500/5">
+        <span className="text-sm">🥊</span>
+        <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Próximo UFC</span>
+        <span className="ml-auto text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-full">Em breve</span>
+      </div>
+      <div className="px-4 py-3 flex flex-col gap-2">
+        <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug">{title}</p>
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>📅 {dateStr}</span>
+          <span>⏰ {timeStr}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+            <div className="h-full bg-red-400 rounded-full" style={{ width: `${prob}%` }} />
+          </div>
+          <span className="text-[10px] font-bold text-red-400">{prob}%</span>
+        </div>
+        <button
+          onClick={() => navigate(`/mercado/${ufcMarket.id}`)}
+          className="w-full py-1.5 rounded-lg text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+        >
+          Ver mercado →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Sidebar({ markets }: { markets: DBMarket[] }) {
   const trending = useMemo(() => [...markets].sort((a, b) => b.volume - a.volume).slice(0, 5), [markets]);
   const recent   = useMemo(() => [...markets].reverse().slice(0, 4), [markets]);
   return (
     <div className="flex flex-col gap-3">
+      <UFCSidebarCard />
       <div className="rounded-xl border border-emerald-500/20 overflow-hidden" style={{ background: "linear-gradient(135deg,#0f2a1a,#111827)" }}>
         <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors">
           <div className="flex items-center gap-2"><span className="text-lg">🏆</span><span className="text-sm font-semibold text-foreground">Basquete Pro Playoffs</span></div>
@@ -691,8 +746,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* AJUSTE 03: Card UFC flutuante no canto superior direito */}
-      <UFCFloatingCard />
 
       <div className="border-b border-border/50 bg-card/60 sticky top-0 z-20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
