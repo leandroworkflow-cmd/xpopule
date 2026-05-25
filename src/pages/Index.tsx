@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { extractTeamsFromTitle } from "@/lib/teamLogos";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { UFCFloatingCard } from "@/components/UFCFloatingCard";
 
 const CATEGORIES = [
   { key: "esportes",       label: "Esportiva",   icon: Trophy,       color: "text-orange-400" },
@@ -170,22 +171,16 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           <button onClick={() => setIdx((i) => (i + 1) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
         </div>
       </div>
-      {/* Título */}
       <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
         <h2 className="text-lg font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
-
-      {/* ── LAYOUT KALSHI: probabilidades esquerda + gráfico direita ── */}
       <div className="flex items-stretch border-t border-border/30">
-
-        {/* ESQUERDA: probabilidades */}
         <div className="flex flex-col justify-between px-4 py-3 w-[300px] shrink-0">
           <div className="flex items-center text-xs text-muted-foreground mb-3">
             <span className="flex-1">Mercado</span>
             <span className="w-14 text-center mr-3">Paga fora</span>
             <span className="w-16 text-center">Probabilidades</span>
           </div>
-
           <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               {homeLogo
@@ -196,7 +191,6 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
           </div>
-
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               {awayLogo
@@ -207,18 +201,14 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
           </div>
-
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol(featured.volume || 0)} vol</span>
             <span>Espalhe e Total</span>
           </div>
         </div>
-
-        {/* DIREITA: gráfico */}
         <div className="flex-1 border-l border-border/30 min-w-0">
           <PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} />
         </div>
-
       </div>
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
         {[
@@ -262,7 +252,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const category   = featured.category || "";
   const icon       = SPORT_ICONS[category] || "🏆";
   const colorCls   = SPORT_COLORS[category] || "text-violet-400 bg-violet-500/10 border-violet-500/20";
-  // Usa event_date se disponível (hora real do jogo), fallback para end_date
   const eventDate  = (featured as any).event_date || (featured as any).end_date || "";
   const endDateObj = new Date(eventDate);
   const now        = new Date();
@@ -271,13 +260,10 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const dateLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
   const timeLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
 
-  const homeLogo = (featured as any).home_logo || null;
-  const awayLogo = (featured as any).away_logo || null;
-  const parts    = title.split(/ x | vs /i);
-  const teamA    = parts[0]?.trim() || "Time A";
-  const teamB    = parts[1]?.trim() || "Time B";
+  const parts  = title.split(/ x | vs /i);
+  const teamA  = parts[0]?.trim() || "Time A";
+  const teamB  = parts[1]?.trim() || "Time B";
 
-  const { data: posHome } = useMarketPosicoes ? { data: [] } : { data: [] };
   const yesProb = Math.round(((featured as any).yes_prob ?? 50));
   const noProb  = 100 - yesProb;
   const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
@@ -330,7 +316,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
         <h2 className="text-lg font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
 
-      {/* Layout Kalshi: probabilidades esquerda + times/logos direita */}
+      {/* Layout: probabilidades esquerda + gráfico e próximos jogos direita */}
       <div className="flex items-stretch border-t border-border/30">
 
         {/* ESQUERDA: probabilidades */}
@@ -341,22 +327,14 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
             <span className="w-16 text-center">Probabilidades</span>
           </div>
 
-          {/* Time A */}
+          {/* AJUSTE 02: Time A — sempre silhueta azul */}
           <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              {homeLogo
-                ? <img src={homeLogo} alt={teamA} className="h-8 w-8 rounded-lg object-contain bg-muted shrink-0"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                : category === "basquete"
-                  ? <div className="h-8 w-8 rounded-lg bg-purple-900 flex items-center justify-center shrink-0 overflow-hidden border border-purple-500/30">
-                      <svg viewBox="0 0 100 100" className="h-7 w-7">
-                        <rect width="100" height="100" fill="#4c1d95"/>
-                        <ellipse cx="50" cy="50" rx="28" ry="28" fill="#7c3aed" opacity="0.3"/>
-                        <text x="50" y="58" textAnchor="middle" fontSize="28" fontWeight="bold" fill="white" fontFamily="Arial">NBA</text>
-                      </svg>
-                    </div>
-                  : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamA.slice(0,2).toUpperCase()}</div>
-              }
+              <img
+                src="/silhueta1.png"
+                alt={teamA}
+                className="h-8 w-8 rounded-lg object-contain bg-blue-950 shrink-0 border border-blue-500/30"
+              />
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
@@ -366,22 +344,14 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
             </button>
           </div>
 
-          {/* Time B */}
+          {/* AJUSTE 02: Time B — sempre silhueta roxa */}
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              {awayLogo
-                ? <img src={awayLogo} alt={teamB} className="h-8 w-8 rounded-lg object-contain bg-muted shrink-0"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                : category === "basquete"
-                  ? <div className="h-8 w-8 rounded-lg bg-blue-900 flex items-center justify-center shrink-0 overflow-hidden border border-blue-500/30">
-                      <svg viewBox="0 0 100 100" className="h-7 w-7">
-                        <rect width="100" height="50" fill="#1e3a8a"/>
-                        <rect y="50" width="100" height="50" fill="#991b1b"/>
-                        <text x="50" y="58" textAnchor="middle" fontSize="28" fontWeight="bold" fill="white" fontFamily="Arial">NBA</text>
-                      </svg>
-                    </div>
-                  : <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{teamB.slice(0,2).toUpperCase()}</div>
-              }
+              <img
+                src="/silhueta2.png"
+                alt={teamB}
+                className="h-8 w-8 rounded-lg object-contain bg-purple-950 shrink-0 border border-purple-500/30"
+              />
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
@@ -397,41 +367,53 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           </div>
         </div>
 
-        {/* DIREITA: próximos jogos da modalidade */}
-        <div className="flex-1 border-l border-border/30 min-w-0 p-4">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Próximos jogos</p>
-          <div className="flex flex-col gap-2">
-            {markets.slice(0, 5).map((m, i) => {
-              const t    = (m as any).nome || m.title || "";
-              const d    = new Date((m as any).end_date || "");
-              const dl   = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-              const tl   = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-              const cat  = m.category || "";
-              const ico  = SPORT_ICONS[cat] || "🏆";
-              const isCurrent = i === idx;
-              return (
-                <div key={m.id}
-                  onClick={() => setIdx(i)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all
-                    ${isCurrent ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/40 border border-transparent"}`}>
-                  <span className="text-base shrink-0">{ico}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-medium truncate ${isCurrent ? "text-primary" : "text-foreground"}`}>{t}</p>
-                    <p className="text-[10px] text-muted-foreground">{dl} · {tl}</p>
+        {/* AJUSTE 01: DIREITA — gráfico em cima + próximos jogos embaixo */}
+        <div className="flex-1 border-l border-border/30 min-w-0 flex flex-col">
+
+          {/* Gráfico de probabilidade */}
+          <PriceChart marketId={featured.id} labelA={teamA} labelB={teamB} />
+
+          {/* Próximos jogos */}
+          <div className="flex-1 border-t border-border/30 p-4">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Próximos jogos
+            </p>
+            <div className="flex flex-col gap-2">
+              {markets.slice(0, 3).map((m, i) => {
+                const t   = (m as any).nome || m.title || "";
+                const d   = new Date((m as any).end_date || "");
+                const dl  = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+                const tl  = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                const ico = SPORT_ICONS[m.category] || "🏆";
+                const isCurrent = i === idx;
+                return (
+                  <div key={m.id}
+                    onClick={() => setIdx(i)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all
+                      ${isCurrent
+                        ? "bg-primary/10 border border-primary/30"
+                        : "hover:bg-muted/40 border border-transparent"}`}>
+                    <span className="text-base shrink-0">{ico}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium truncate ${isCurrent ? "text-primary" : "text-foreground"}`}>{t}</p>
+                      <p className="text-[10px] text-muted-foreground">{dl} · {tl}</p>
+                    </div>
+                    {isCurrent && <span className="text-[9px] font-bold text-primary shrink-0">● ativo</span>}
                   </div>
-                  {isCurrent && <span className="text-[9px] font-bold text-primary shrink-0">● ativo</span>}
-                </div>
-              );
-            })}
-            {markets.length > 5 && (
-              <p className="text-[10px] text-muted-foreground text-center pt-1">+{markets.length - 5} jogos</p>
-            )}
+                );
+              })}
+              {markets.length > 3 && (
+                <p className="text-[10px] text-muted-foreground text-center pt-1">
+                  +{markets.length - 3} jogos
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
       </div>
 
-      {/* Footer amarelo */}
+      {/* Footer */}
       <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
@@ -462,7 +444,6 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
   const isMulti     = tipoMercado === "multiplo" || tipoMercado === "periodo";
   const { data: opcoes = [] } = useOpcoesMercado(market.id, isMulti);
 
-  // ── MÚLTIPLO ────────────────────────────────────────────────────────────────
   if (tipoMercado === "multiplo") {
     return (
       <div onClick={() => navigate(`/mercado/${market.id}`)}
@@ -475,35 +456,26 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
         <div className="flex flex-col gap-2">
           {(opcoes as any[]).slice(0, 3).map((op) => (
             <div key={op.id} className="flex items-center gap-3 py-2 px-2 rounded-lg bg-muted/20 border border-border/30 hover:border-primary/30 transition-all">
-              {/* Foto do candidato com fallback */}
               {op.foto_url ? (
-                <img
-                  src={op.foto_url}
-                  alt={op.label}
+                <img src={op.foto_url} alt={op.label}
                   className="h-12 w-12 rounded-lg object-cover border-2 border-border/40 shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = "none";
                     const sibling = target.nextElementSibling as HTMLElement;
                     if (sibling) sibling.style.display = "flex";
-                  }}
-                />
+                  }} />
               ) : null}
-              {/* Fallback com inicial */}
-              <div
-                className="h-12 w-12 rounded-lg bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0"
-                style={{ display: op.foto_url ? "none" : "flex" }}
-              >
+              <div className="h-12 w-12 rounded-lg bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0"
+                style={{ display: op.foto_url ? "none" : "flex" }}>
                 {op.label.slice(0, 1).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{op.label}</p>
                 {op.descricao && <p className="text-[10px] text-muted-foreground truncate">{op.descricao}</p>}
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); onSelect(market); }}
-                className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors shrink-0"
-              >
+              <button onClick={(e) => { e.stopPropagation(); onSelect(market); }}
+                className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors shrink-0">
                 {op.probabilidade}%
               </button>
             </div>
@@ -517,7 +489,6 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
     );
   }
 
-  // ── PERÍODO ─────────────────────────────────────────────────────────────────
   if (tipoMercado === "periodo") {
     const maxProb = Math.max(...(opcoes as any[]).map((o) => Number(o.probabilidade) || 0), 0);
     return (
@@ -552,7 +523,6 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
     );
   }
 
-  // ── BINÁRIO padrão ───────────────────────────────────────────────────────────
   const parts = title.split(/ x | vs /i);
   const optA  = parts[0]?.trim().split(/[:\-–—]/)[0].trim() || "Sim";
   const optB  = parts[1]?.trim().split(/[:\-–—]/)[0].trim() || "Não";
@@ -694,7 +664,6 @@ const Index = () => {
   const sportsMarkets   = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
   const otherCategories = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
 
-  // Outras modalidades: basquete, luta, volei, tenis — próximos 3 dias
   const otherSportsMarkets = useMemo(() => {
     const now    = new Date();
     const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
@@ -710,16 +679,21 @@ const Index = () => {
         return da - db;
       });
   }, [activeMarkets]);
-  const displayMarkets  = useMemo(() => {
+
+  const displayMarkets = useMemo(() => {
     let base = activeMarkets;
     if (activeCategory !== "todos") base = base.filter((m) => m.category === activeCategory);
     if (search) base = base.filter((m) => ((m as any).nome || m.title || "").toLowerCase().includes(search.toLowerCase()));
     return base.sort((a, b) => b.volume - a.volume);
   }, [activeMarkets, activeCategory, search]);
+
   const isSearching = !!search || activeCategory !== "todos";
 
   return (
     <div className="min-h-screen bg-background">
+      {/* AJUSTE 03: Card UFC flutuante no canto superior direito */}
+      <UFCFloatingCard />
+
       <div className="border-b border-border/50 bg-card/60 sticky top-0 z-20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {CAT_BAR.map((c) => (
@@ -730,6 +704,7 @@ const Index = () => {
           ))}
         </div>
       </div>
+
       <div className="max-w-6xl mx-auto px-4 py-5">
         <div className="flex flex-wrap items-center gap-3 mb-5">
           <div className="relative w-full max-w-sm">
@@ -747,6 +722,7 @@ const Index = () => {
             ))}
           </div>
         </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
           <div>
             {isLoading ? (
@@ -757,7 +733,6 @@ const Index = () => {
               ) : <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
             ) : (
               <div className="flex flex-col gap-8">
-                {/* ── OUTRAS MODALIDADES: Basquete, MMA, Vôlei, Tênis ── */}
                 {otherSportsMarkets.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
@@ -769,8 +744,6 @@ const Index = () => {
                     <OtherSportsFeaturedCard markets={otherSportsMarkets} onSelect={setSelectedMarket} />
                   </div>
                 )}
-
-                {/* ── FUTEBOL ── */}
                 {sportsMarkets.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
@@ -788,6 +761,7 @@ const Index = () => {
           <div className="hidden lg:block"><Sidebar markets={activeMarkets} /></div>
         </div>
       </div>
+
       <TradingDrawer market={selectedMarket} open={!!selectedMarket} onClose={() => setSelectedMarket(null)} posicoes={posicoes} />
     </div>
   );
