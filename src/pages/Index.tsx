@@ -52,7 +52,12 @@ function filterActive(markets: DBMarket[]): DBMarket[] {
   const now = new Date();
   return markets.filter((m) => {
     const end = new Date((m as any).end_date || (m as any).event_date || "");
-    return isNaN(end.getTime()) || end >= now;
+    if (isNaN(end.getTime())) return true;
+    // Para mercados esportivos, mantém visível por até 2h após o início do jogo
+    // pois end_date é a hora de início, não de término
+    const isSport = ["esportes", "basquete", "luta", "volei", "tenis"].includes((m as any).category);
+    const bufferMs = isSport ? 2 * 60 * 60 * 1000 : 0;
+    return end.getTime() + bufferMs >= now.getTime();
   });
 }
 
@@ -173,8 +178,8 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
       <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
         <h2 className="text-lg font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
-      <div className="flex items-stretch border-t border-border/30">
-        <div className="flex flex-col justify-between px-4 py-3 w-[300px] shrink-0">
+      <div className="flex flex-col md:flex-row items-stretch border-t border-border/30">
+        <div className="flex flex-col justify-between px-4 py-3 w-full md:w-[300px] md:shrink-0">
           <div className="flex items-center text-xs text-muted-foreground mb-3">
             <span className="flex-1">Mercado</span>
             <span className="w-14 text-center mr-3">Paga fora</span>
@@ -209,7 +214,7 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           <PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} />
         </div>
       </div>
-      <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
+      <div className="border-t border-border/30 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
           { icon: "🛡️", title: "Negociação Responsável",     sub: "Ferramentas e dicas para negociar de forma inteligente" },
@@ -316,10 +321,10 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
       </div>
 
       {/* Layout: probabilidades esquerda + gráfico e próximos jogos direita */}
-      <div className="flex items-stretch border-t border-border/30">
+      <div className="flex flex-col md:flex-row items-stretch border-t border-border/30">
 
         {/* ESQUERDA: probabilidades */}
-        <div className="flex flex-col justify-between px-4 py-3 w-[300px] shrink-0">
+        <div className="flex flex-col justify-between px-4 py-3 w-full md:w-[300px] md:shrink-0">
           <div className="flex items-center text-xs text-muted-foreground mb-3">
             <span className="flex-1">Mercado</span>
             <span className="w-14 text-center mr-3">Paga fora</span>
@@ -409,7 +414,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
       </div>
 
       {/* Footer */}
-      <div className="border-t border-border/30 grid grid-cols-3 divide-x divide-border/30">
+      <div className="border-t border-border/30 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
           { icon: "🛡️", title: "Negociação Responsável",     sub: "Ferramentas e dicas para negociar de forma inteligente" },
@@ -574,7 +579,7 @@ function CategoryGrid({ cat, onSelect }: { cat: { key: string; label: string; ic
         </div>
         <span className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-0.5">Ver todos <ChevronRight className="h-3 w-3" /></span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {top4.map((m) => <CategoryMiniCard key={m.id} market={m} onSelect={onSelect} />)}
       </div>
     </div>
@@ -817,7 +822,7 @@ const Index = () => {
 
       <div className="max-w-6xl mx-auto px-4 py-5">
         <div className="flex flex-wrap items-center gap-3 mb-5">
-          <div className="relative w-full max-w-sm">
+          <div className="relative w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar eventos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-card border-border h-10 text-sm rounded-xl" />
           </div>
