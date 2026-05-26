@@ -583,6 +583,8 @@ function CategoryGrid({ cat, onSelect }: { cat: { key: string; label: string; ic
 
 function UFCSidebarCard() {
   const navigate = useNavigate();
+
+  // Busca mercado de luta no banco (para o link "Ver mercado")
   const { data: ufcMarket } = useQuery({
     queryKey: ["ufc_next_sidebar"],
     queryFn: async () => {
@@ -598,55 +600,94 @@ function UFCSidebarCard() {
       return data;
     },
   });
-  if (!ufcMarket) return null;
-  const title   = (ufcMarket as any).nome || "";
-  const rawDate = (ufcMarket as any).end_date;
-  const endDate = rawDate ? new Date(rawDate) : null;
-  const isValid = endDate && !isNaN(endDate.getTime());
-  const dateStr = isValid ? endDate!.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
-  const timeStr = isValid ? endDate!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
-  const prob    = (ufcMarket as any).yes_prob ?? 50;
+
+  // Busca próximo evento do UFC via API ESPN
+  const { data: espnData } = useQuery({
+    queryKey: ["ufc_espn"],
+    queryFn: async () => {
+      const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard");
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10, // cache 10min
+  });
+
+  // Extrai dados do evento ESPN
+  const espnEvent    = espnData?.events?.[0];
+  const eventName    = espnEvent?.name || "";
+  const eventDate    = espnEvent?.date ? new Date(espnEvent.date) : null;
+  const isValid      = eventDate && !isNaN(eventDate.getTime());
+  const dateStr      = isValid ? eventDate!.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+  const timeStr      = isValid ? eventDate!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+  const venue        = espnEvent?.venues?.[0]?.fullName || "";
+
+  // Pega a luta principal (última da lista = main event)
+  const competitions = espnEvent?.competitions || [];
+  const mainEvent    = competitions[competitions.length - 1];
+  const compA        = mainEvent?.competitors?.[0];
+  const compB        = mainEvent?.competitors?.[1];
+  const idA          = compA?.id || "";
+  const idB          = compB?.id || "";
+  const nameA        = compA?.athlete?.shortName || "—";
+  const nameB        = compB?.athlete?.shortName || "—";
+  // URL de headshot oficial ESPN para MMA
+  const photoA       = idA ? `https://a.espncdn.com/i/headshots/mma/players/full/${idA}.png` : "";
+  const photoB       = idB ? `https://a.espncdn.com/i/headshots/mma/players/full/${idB}.png` : "";
+  const ufc_logo     = "https://a.espncdn.com/i/teamlogos/leagues/500/ufc.png";
+
+  if (!espnEvent && !ufcMarket) return null;
+
   return (
     <div className="rounded-xl border border-red-500/30 bg-card overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/40 bg-red-500/5">
-        <span className="text-sm">🥊</span>
+      {/* Header com logo UFC */}
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-red-500/5">
+        <img src={ufc_logo} alt="UFC" className="h-5 w-5 object-contain" />
         <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Próximo UFC</span>
         <span className="ml-auto text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-full">Em breve</span>
       </div>
 
-      {/* Silhuetas dos lutadores */}
-      <div className="flex items-center justify-center gap-3 px-4 pt-3 pb-1">
-        <div className="flex flex-col items-center gap-1">
-          <div className="h-14 w-10 rounded-xl bg-red-950 border-2 border-white/80 overflow-hidden shadow-md">
-            <img src="/silhueta1.png" alt="Lutador A" className="h-full w-full object-cover" />
+      {/* Nome do evento */}
+      <div className="px-4 pt-3 pb-1">
+        <p className="text-[11px] font-bold text-foreground text-center leading-snug line-clamp-2">{eventName || (ufcMarket as any)?.nome}</p>
+        {venue && <p className="text-[9px] text-muted-foreground text-center mt-0.5">📍 {venue}</p>}
+      </div>
+
+      {/* Fotos reais dos lutadores via ESPN headshots */}
+      <div className="flex items-end justify-center gap-2 px-4 pt-2 pb-1">
+        <div className="flex flex-col items-center gap-1 flex-1">
+          <div className="h-20 w-16 rounded-xl overflow-hidden bg-muted border-2 border-white/20 shadow-md">
+            <img
+              src={photoA}
+              alt={nameA}
+              className="h-full w-full object-cover object-top"
+              onError={(e) => { (e.target as HTMLImageElement).src = "/silhueta1.png"; }}
+            />
           </div>
-          <span className="text-[9px] text-muted-foreground">Lutador A</span>
+          <span className="text-[9px] font-semibold text-foreground text-center truncate w-full">{nameA}</span>
         </div>
-        <span className="text-xs font-black text-red-400">VS</span>
-        <div className="flex flex-col items-center gap-1">
-          <div className="h-14 w-10 rounded-xl bg-red-900 border-2 border-white/80 overflow-hidden shadow-md">
-            <img src="/silhueta2.png" alt="Lutador B" className="h-full w-full object-cover" />
+
+        <span className="text-sm font-black text-red-400 shrink-0 mb-6">VS</span>
+
+        <div className="flex flex-col items-center gap-1 flex-1">
+          <div className="h-20 w-16 rounded-xl overflow-hidden bg-muted border-2 border-white/20 shadow-md">
+            <img
+              src={photoB}
+              alt={nameB}
+              className="h-full w-full object-cover object-top"
+              onError={(e) => { (e.target as HTMLImageElement).src = "/silhueta2.png"; }}
+            />
           </div>
-          <span className="text-[9px] text-muted-foreground">Lutador B</span>
+          <span className="text-[9px] font-semibold text-foreground text-center truncate w-full">{nameB}</span>
         </div>
       </div>
 
-      {/* Info */}
+      {/* Data e hora */}
       <div className="px-4 py-2 flex flex-col gap-2">
-        <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug text-center">{title}</p>
         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
           <span>📅 {dateStr}</span>
           <span>⏰ {timeStr}</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-            <div className="h-full bg-red-400 rounded-full" style={{ width: `${prob}%` }} />
-          </div>
-          <span className="text-[10px] font-bold text-red-400">{prob}%</span>
-        </div>
         <button
-          onClick={() => navigate(`/mercado/${ufcMarket.id}`)}
+          onClick={() => ufcMarket && navigate(`/mercado/${ufcMarket.id}`)}
           className="w-full py-1.5 rounded-lg text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors"
         >
           Ver mercado →
