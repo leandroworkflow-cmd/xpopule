@@ -119,15 +119,23 @@ async function fetchNBA() {
 }
 
 // ── MMA/UFC ───────────────────────────────────────────────────────────────────
-// ✅ CORRIGIDO: busca as lutas de cada evento e salva atletas em posicoes
+// ✅ Extrai atletas do short_name do evento (ex: "UFC Fight Night: Medić vs. Rodriguez")
+// O endpoint /fights é pago — usamos só /events que está disponível
 
-async function fetchMMAFights(eventId) {
-  // Busca as lutas individuais do evento para pegar os nomes dos atletas
-  const url = "https://api.balldontlie.io/mma/v1/fights?event_id=" + eventId + "&per_page=50";
-  const res = await fetch(url, { headers: { Authorization: BDL_KEY } });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.data || [];
+function extrairAtletasDoNome(shortName) {
+  // Padrões: "UFC Fight Night: Medić vs. Rodriguez"
+  //          "PFL DC: Jean vs. Musaev"
+  //          "UFC 300: Jones vs. Miocic"
+  const match = shortName.match(/:\s*(.+?)\s+vs\.?\s+(.+)$/i);
+  if (match) {
+    return { nomeA: match[1].trim(), nomeB: match[2].trim() };
+  }
+  // Tenta sem prefixo: "Jones vs. Miocic"
+  const matchSimples = shortName.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
+  if (matchSimples) {
+    return { nomeA: matchSimples[1].trim(), nomeB: matchSimples[2].trim() };
+  }
+  return { nomeA: null, nomeB: null };
 }
 
 async function fetchMMA() {
@@ -142,11 +150,15 @@ async function fetchMMA() {
   const limite = new Date();
   limite.setDate(limite.getDate() + OUTROS_DAYS);
 
+  // ✅ Amplia para 60 dias para pegar mais eventos (14 dias era muito curto para MMA)
+  const limiteMMA = new Date();
+  limiteMMA.setDate(limiteMMA.getDate() + 60);
+
   const eventos = (data.data || []).filter(e => {
     const s = (e.status || "").toLowerCase();
     const d = new Date(e.date);
-    return s === "scheduled" && d > agora && d <= limite;
-  }).slice(0, 10);
+    return s === "scheduled" && d > agora && d <= limiteMMA;
+  }).slice(0, 15);
 
   console.log(eventos.length + " eventos.");
 
@@ -154,12 +166,18 @@ async function fetchMMA() {
   const posicoes = [];
 
   for (const e of eventos) {
-    const dataEvento = new Date(e.date);
-    const marketId   = "mma_" + e.id;
+    const dataEvento           = new Date(e.date);
+    const marketId             = "mma_" + e.id;
+    const { nomeA, nomeB }     = extrairAtletasDoNome(e.short_name || e.name);
+
+    // ✅ Se tem atletas no nome, usa "AtletaA vs AtletaB"; senão usa nome do evento
+    const nomeMarket = (nomeA && nomeB)
+      ? nomeA + " vs " + nomeB
+      : e.name;
 
     markets.push({
       id:         marketId,
-      nome:       e.name,
+      nome:       nomeMarket,
       end_date:   dataEvento.toISOString(),
       event_date: dataEvento.toISOString(),
       home_logo:  null,
@@ -170,71 +188,35 @@ async function fetchMMA() {
       yes_prob:   50,
     });
 
-    // ✅ Busca as lutas do evento para pegar nomes dos atletas
-    const fights = await fetchMMAFights(e.id);
-    await sleep(300); // respeita rate limit
-
-    // Pega a luta principal (main event) — geralmente a primeira ou a de maior ordem
-    const mainFight = fights[0];
-    if (mainFight) {
-      // ✅ nome do atleta A (time_casa = favorito/vermelho)
-      const nomeA =
-        mainFight.fighter1?.full_name ||
-        mainFight.home_fighter?.full_name ||
-        mainFight.red_corner?.full_name ||
-        mainFight.athlete1?.full_name ||
-        null;
-
-      // ✅ nome do atleta B (time_fora = azul)
-      const nomeB =
-        mainFight.fighter2?.full_name ||
-        mainFight.away_fighter?.full_name ||
-        mainFight.blue_corner?.full_name ||
-        mainFight.athlete2?.full_name ||
-        null;
-
-      if (nomeA || nomeB) {
-        // Atualiza o nome do mercado para "Atleta A vs Atleta B"
-        markets[markets.length - 1].nome = (nomeA || "?") + " vs " + (nomeB || "?");
+    posicoes.push(
+      {
+        mercado_id:     marketId,
+        tipo:           "time_casa",
+        nome_atleta:    nomeA,   // null se não encontrou no nome
+        preco_unitario: 0.65,
+        volume_total:   1000,
+        volume_dispor:  1000,
+        volume_compra:  0,
+      },
+      {
+        mercado_id:     marketId,
+        tipo:           "empate",
+        nome_atleta:    null,
+        preco_unitario: 0.20,
+        volume_total:   1000,
+        volume_dispor:  1000,
+        volume_compra:  0,
+      },
+      {
+        mercado_id:     marketId,
+        tipo:           "time_fora",
+        nome_atleta:    nomeB,   // null se não encontrou no nome
+        preco_unitario: 0.15,
+        volume_total:   1000,
+        volume_dispor:  1000,
+        volume_compra:  0,
       }
-
-      posicoes.push(
-        {
-          mercado_id:     marketId,
-          tipo:           "time_casa",
-          nome_atleta:    nomeA || e.name,
-          preco_unitario: 0.65,
-          volume_total:   1000,
-          volume_dispor:  1000,
-          volume_compra:  0,
-        },
-        {
-          mercado_id:     marketId,
-          tipo:           "empate",
-          nome_atleta:    null,
-          preco_unitario: 0.20,
-          volume_total:   1000,
-          volume_dispor:  1000,
-          volume_compra:  0,
-        },
-        {
-          mercado_id:     marketId,
-          tipo:           "time_fora",
-          nome_atleta:    nomeB || e.name,
-          preco_unitario: 0.15,
-          volume_total:   1000,
-          volume_dispor:  1000,
-          volume_compra:  0,
-        }
-      );
-    } else {
-      // Sem lutas na API — cria posicoes sem nome de atleta
-      posicoes.push(
-        { mercado_id: marketId, tipo: "time_casa", nome_atleta: null, preco_unitario: 0.65, volume_total: 1000, volume_dispor: 1000, volume_compra: 0 },
-        { mercado_id: marketId, tipo: "empate",    nome_atleta: null, preco_unitario: 0.20, volume_total: 1000, volume_dispor: 1000, volume_compra: 0 },
-        { mercado_id: marketId, tipo: "time_fora", nome_atleta: null, preco_unitario: 0.15, volume_total: 1000, volume_dispor: 1000, volume_compra: 0 },
-      );
-    }
+    );
   }
 
   return { markets, posicoes };
