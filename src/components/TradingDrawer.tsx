@@ -42,15 +42,44 @@ function calcPari(amount: number, pricePerContract: number) {
   return { qty, subtotal, fee, totalCost, potentialReturn, netProfit, odd };
 }
 
+// ✅ Extrai os dois lados de qualquer título com "X", "x", "vs", "vs."
+function extrairLadosDoNome(nome: string): { ladoA: string; ladoB: string } | null {
+  const separators = [/\s+vs\.?\s+/i, /\s+X\s+/];
+  for (const sep of separators) {
+    const parts = nome.split(sep);
+    if (parts.length >= 2) {
+      // Para lutas com prefixo "UFC Fight Night: Atleta vs Atleta"
+      // tira o prefixo do lado A se tiver ":"
+      const rawA = parts[0].includes(":") ? parts[0].split(":").pop()! : parts[0];
+      const rawB = parts[1].split(/[:\-–—]/)[0];
+      return { ladoA: rawA.trim(), ladoB: rawB.trim() };
+    }
+  }
+  return null;
+}
+
 interface TradingDrawerProps {
   market: DBMarket | null;
   open: boolean;
   onClose: () => void;
   selectedTipo?: "time_casa" | "empate" | "time_fora";
   posicoes?: any[];
+  // ✅ Props opcionais vindas do MarketDetail para binários com nome de atleta
+  selectedSide?: "sim" | "nao" | null;
+  yesLabel?: string;
+  noLabel?: string;
 }
 
-export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa", posicoes = [] }: TradingDrawerProps) {
+export function TradingDrawer({
+  market,
+  open,
+  onClose,
+  selectedTipo = "time_casa",
+  posicoes = [],
+  selectedSide,
+  yesLabel,
+  noLabel,
+}: TradingDrawerProps) {
   const [tipo, setTipo] = useState<"time_casa" | "empate" | "time_fora">(selectedTipo);
   const [amountDisplay, setAmountDisplay] = useState("1,00");
   const [loading, setLoading] = useState(false);
@@ -61,19 +90,46 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
 
   if (!market) return null;
 
-  const title = (market as any).nome || (market as any).title || "";
-  const isSport  = (market as any).category === "esportes";
-  const timeCasa = isSport ? ((market as any).time_casa || "Time A") : "Sim";
-  const timeFora = isSport ? ((market as any).time_fora || "Time B") : "Não";
-  const dataEvento = (market as any).data_evento || (market as any).end_date;
-  const descricao = (market as any).descricao || (market as any).resolution_rule || "";
+  const title    = (market as any).nome || (market as any).title || "";
+  const category = (market as any).category || "";
 
-  const posicaoAtual = posicoes.find((p) => p.tipo === tipo);
+  // ✅ Categorias que têm dois lados com nomes reais
+  const isBiSided = ["esportes", "luta", "basquete", "tenis"].includes(category);
+
+  // ✅ Tenta obter nomes: 1) posicoes.nome_atleta, 2) split do título, 3) fallback
+  const posicaoCasa = posicoes.find((p) => p.tipo === "time_casa");
+  const posicaoFora = posicoes.find((p) => p.tipo === "time_fora");
+
+  const ladosDoNome = extrairLadosDoNome(title);
+
+  const timeCasa =
+    posicaoCasa?.nome_atleta ||          // banco (MMA novos)
+    yesLabel ||                           // prop do MarketDetail
+    ladosDoNome?.ladoA ||                 // split do título
+    (market as any).time_casa ||          // campo legado
+    (isBiSided ? "Time A" : "Sim");
+
+  const timeFora =
+    posicaoFora?.nome_atleta ||
+    noLabel ||
+    ladosDoNome?.ladoB ||
+    (market as any).time_fora ||
+    (isBiSided ? "Time B" : "Não");
+
+  const dataEvento = (market as any).data_evento || (market as any).end_date;
+  const descricao  = (market as any).descricao || (market as any).resolution_rule || "";
+
+  // Esportes e lutas mostram empate; basquete e tênis não
+  const temEmpate = ["esportes", "luta"].includes(category);
+  const opcoes = temEmpate
+    ? (["time_casa", "empate", "time_fora"] as const)
+    : (["time_casa", "time_fora"] as const);
+
+  const posicaoAtual     = posicoes.find((p) => p.tipo === tipo);
   const pricePerContract = posicaoAtual?.preco_unitario ?? 0.50;
-  const semEstoque = false;
 
   const amount = parseCurrency(amountDisplay);
-  const calc = calcPari(amount, pricePerContract);
+  const calc   = calcPari(amount, pricePerContract);
   const invalidAmount = amount < MIN_AMOUNT;
 
   const tipoLabel = (t: string) => {
@@ -106,8 +162,8 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
     try {
       const { data, error } = await supabase.functions.invoke("criar-pagamento", {
         body: {
-          amount: calc.totalCost,      // ✅ CORRIGIDO: era "valor"
-          userId: user.id,             // ✅ CORRIGIDO: era "user_id"
+          amount: calc.totalCost,
+          userId: user.id,
           marketId: market.id,
           tipo,
           quantity: calc.qty,
@@ -141,7 +197,7 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Escolha sua posição</label>
             <div className="flex gap-2">
-              {(isSport ? ["time_casa", "empate", "time_fora"] : ["time_casa", "time_fora"] as const).map((t) => {
+              {opcoes.map((t) => {
                 const pos = posicoes.find((p) => p.tipo === t);
                 const isSelected = tipo === t;
                 const price = pos?.preco_unitario ?? 0.50;
@@ -152,8 +208,14 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
                   ? isSelected ? "bg-danger/20 border-danger text-danger" : "border-border text-muted-foreground hover:border-danger/50"
                   : isSelected ? "bg-primary/20 border-primary text-primary" : "border-border text-muted-foreground hover:border-primary/50";
                 return (
-                  <button key={t} onClick={() => setTipo(t as any)} className={`flex-1 flex flex-col items-center gap-0.5 py-3 px-1 rounded-lg border transition-all ${colorClass}`}>
-                    <span className="text-[10px] font-medium text-center leading-tight truncate w-full">{tipoLabel(t)}</span>
+                  <button
+                    key={t}
+                    onClick={() => setTipo(t as any)}
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-3 px-1 rounded-lg border transition-all ${colorClass}`}
+                  >
+                    <span className="text-[10px] font-medium text-center leading-tight truncate w-full px-1">
+                      {tipoLabel(t)}
+                    </span>
                     <span className="text-sm font-bold">{odd}x</span>
                     <span className="text-[9px] opacity-70">R$ {fmt(price)}/ctr</span>
                   </button>
@@ -167,9 +229,17 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
             <label className="text-sm text-muted-foreground mb-2 block">Valor rápido</label>
             <div className="grid grid-cols-5 gap-2">
               {QUICK_AMOUNTS.map((val) => (
-                <Button key={val} variant="outline" size="sm" className="h-10 font-bold" onClick={() => addAmount(val)}>+{val}</Button>
+                <Button key={val} variant="outline" size="sm" className="h-10 font-bold" onClick={() => addAmount(val)}>
+                  +{val}
+                </Button>
               ))}
-              <Button variant="outline" size="sm" className="h-10 font-bold text-primary border-primary/30" onClick={() => setAmountDisplay(fmt(balance ?? 0))}>MAX</Button>
+              <Button
+                variant="outline" size="sm"
+                className="h-10 font-bold text-primary border-primary/30"
+                onClick={() => setAmountDisplay(fmt(balance ?? 0))}
+              >
+                MAX
+              </Button>
             </div>
           </div>
 
@@ -178,9 +248,15 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
             <label className="text-sm text-muted-foreground mb-2 block">Valor do investimento</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-lg">R$</span>
-              <Input type="text" inputMode="numeric" value={amountDisplay} onChange={handleAmountChange} className="pl-11 bg-background border-border text-foreground text-lg h-12" />
+              <Input
+                type="text" inputMode="numeric"
+                value={amountDisplay} onChange={handleAmountChange}
+                className="pl-11 bg-background border-border text-foreground text-lg h-12"
+              />
             </div>
-            {invalidAmount && amount > 0 && <p className="text-xs text-destructive mt-1">Valor mínimo: R$ 1,00</p>}
+            {invalidAmount && amount > 0 && (
+              <p className="text-xs text-destructive mt-1">Valor mínimo: R$ 1,00</p>
+            )}
             {!invalidAmount && calc.qty > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 Você está adquirindo <span className="font-semibold text-foreground">{calc.qty}</span> contrato(s) de{" "}
@@ -218,7 +294,9 @@ export function TradingDrawer({ market, open, onClose, selectedTipo = "time_casa
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Lucro líquido estimado</span>
-                <span className={`font-bold text-lg ${calc.netProfit >= 0 ? "text-success" : "text-danger"}`}>R$ {fmt(calc.netProfit)}</span>
+                <span className={`font-bold text-lg ${calc.netProfit >= 0 ? "text-success" : "text-danger"}`}>
+                  R$ {fmt(calc.netProfit)}
+                </span>
               </div>
             </div>
             <p className="text-[10px] text-muted-foreground pt-1">
