@@ -2,14 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DBMarket } from "@/types/market";
 
-// Retorna true se o mercado está acontecendo agora
+// ✅ AO VIVO: event_date <= agora <= event_date + 2h
 export function isLive(market: DBMarket): boolean {
-  const now = new Date();
-  const start = market.start_date ? new Date(market.start_date) : null;
-  const end = market.end_date ? new Date(market.end_date) : null;
+  const now        = new Date();
+  const eventDate  = (market as any).event_date
+    ? new Date((market as any).event_date)
+    : null;
 
-  if (!start || !end) return false;
-  return now >= start && now <= end && market.status === "active";
+  if (!eventDate || market.status !== "active") return false;
+
+  const endLive = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000); // +2h
+  return now >= eventDate && now <= endLive;
 }
 
 export function useMarkets(category?: string | null) {
@@ -22,7 +25,6 @@ export function useMarkets(category?: string | null) {
         .from("markets")
         .select("*")
         .eq("status", "active")
-        // ✅ FIX 1: Exclui jogos cujo end_date já passou
         .gte("end_date", now)
         .order("end_date", { ascending: true });
 
@@ -36,13 +38,11 @@ export function useMarkets(category?: string | null) {
       const mapped = (data || []).map((m: any) => ({
         ...m,
         title: m.nome || m.title || "",
-        // ✅ FIX 2 & 3: Calcula isLive no momento do fetch
         isLive: isLive({ ...m, title: m.nome || m.title || "" } as DBMarket),
       }));
 
       return mapped as unknown as DBMarket[];
     },
-    // Revalida a cada 60s para manter o "AO VIVO" atualizado
     refetchInterval: 60_000,
   });
 }
@@ -63,17 +63,13 @@ export function useMarket(id: string) {
         title: (data as any).nome || (data as any).title || "",
       } as unknown as DBMarket;
 
-      return {
-        ...market,
-        isLive: isLive(market),
-      };
+      return { ...market, isLive: isLive(market) };
     },
     enabled: !!id,
     refetchInterval: 60_000,
   });
 }
 
-// ✅ NOVO: busca as posições (time_casa, empate, time_fora) de um mercado
 export function useMarketPosicoes(marketId: string) {
   return useQuery({
     queryKey: ["posicoes", marketId],
