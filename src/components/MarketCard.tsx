@@ -40,10 +40,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
   const matchDateStr = endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   const matchTimeStr = endDateObj.toLocaleTimeString("pt-BR",  { hour: "2-digit", minute: "2-digit" });
   const now          = new Date();
-  const isToday      =
-    endDateObj.getFullYear() === now.getFullYear() &&
-    endDateObj.getMonth()    === now.getMonth()    &&
-    endDateObj.getDate()     === now.getDate();
+  const isLiveNow = !!(market as any).isLive; // const isToday =
 
   const title       = market.nome || market.title || "";
   const tipoMercado = market.tipo_mercado || "binario";
@@ -80,7 +77,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         {catLabel}
       </span>
 
-      {hasTeams && isToday && (
+      {isLiveNow && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
           <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
