@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { MarketCardSkeleton } from "@/components/MarketCard";
 import { TradingDrawer } from "@/components/TradingDrawer";
@@ -13,7 +13,7 @@ import {
   Clapperboard, CloudSun, BarChart2, Globe,
 } from "lucide-react";
 import { extractTeamsFromTitle } from "@/lib/teamLogos";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
 const CATEGORIES = [
   { key: "esportes",       label: "Esportiva",   icon: Trophy,       color: "text-orange-400" },
@@ -53,8 +53,6 @@ function filterActive(markets: DBMarket[]): DBMarket[] {
   return markets.filter((m) => {
     const end = new Date((m as any).end_date || (m as any).event_date || "");
     if (isNaN(end.getTime())) return true;
-    // Para mercados esportivos, mantém visível por até 2h após o início do jogo
-    // pois end_date é a hora de início, não de término
     const isSport = ["esportes", "basquete", "luta", "volei", "tenis"].includes((m as any).category);
     const bufferMs = isSport ? 2 * 60 * 60 * 1000 : 0;
     return end.getTime() + bufferMs >= now.getTime();
@@ -87,49 +85,153 @@ function fmtVol(v: number | null | undefined) {
   return "—";
 }
 
-type PricePoint = { minute: number; prob_home: number; prob_away: number };
+// ── AnimatedPriceChart ────────────────────────────────────────────────────────
+// Gráfico com movimento orgânico em tempo real (fake/animado).
+// Tenta usar dados reais de price_history; se não houver, gera histórico
+// animado com oscilador seeded pelo marketId — cada mercado tem sua
+// própria "personalidade" de movimento.
 
-function usePriceHistory(marketId: string | null) {
-  const [data, setData]       = useState<PricePoint[]>([]);
-  const [loading, setLoading] = useState(false);
+interface ChartPoint { name: string; home: number; away: number; }
+
+function seedFromId(id: string): number {
+  return id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+}
+
+function createOscillator(seed: number, startProb: number) {
+  let t     = seed % 1000;
+  let prob  = startProb;
+  let trend = Math.sin(seed) * 0.3;
+  return function next(): number {
+    t += 1;
+    const slow    = Math.sin(t * 0.08 + seed) * 1.8;
+    const fast    = Math.sin(t * 0.31 + seed * 2.1) * 0.9;
+    trend        += (Math.random() - 0.505) * 0.04;
+    trend         = Math.max(-0.6, Math.min(0.6, trend));
+    const meanRev = (startProb - prob) * 0.018;
+    prob         += slow * 0.12 + fast * 0.08 + trend + meanRev;
+    prob          = Math.max(15, Math.min(85, prob));
+    return Math.round(prob * 10) / 10;
+  };
+}
+
+function buildInitialHistory(seed: number, startProb: number): ChartPoint[] {
+  const osc = createOscillator(seed, startProb);
+  return Array.from({ length: 15 }, (_, i) => {
+    const home = osc();
+    return { name: `${14 - i}m`, home, away: Math.round((100 - home) * 10) / 10 };
+  }).reverse();
+}
+
+function CustomChartTooltip({ active, payload, labelA, labelB }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: "#111", border: "1px solid #222", borderRadius: 8, padding: "6px 10px", fontSize: 11, color: "#e0e0e0" }}>
+      {payload.map((p: any) => (
+        <div key={p.dataKey} style={{ color: p.stroke, marginBottom: 2 }}>
+          {p.dataKey === "home" ? labelA : labelB}: <b>{Number(p.value).toFixed(1)}%</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnimatedPriceChart({
+  marketId,
+  labelA,
+  labelB,
+  initialProb = 50,
+}: {
+  marketId: string;
+  labelA: string;
+  labelB: string;
+  initialProb?: number;
+}) {
+  const [points, setPoints]   = useState<ChartPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const oscRef   = useRef<(() => number) | null>(null);
+  const tickRef  = useRef<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
-    if (!marketId) { setData([]); return; }
+    if (!marketId) return;
     setLoading(true);
     supabase
       .from("price_history")
       .select("minute, prob_home, prob_away")
       .eq("market_id", marketId)
       .order("minute", { ascending: true })
-      .then(({ data: rows }) => { setData((rows as PricePoint[]) || []); setLoading(false); });
-  }, [marketId]);
-  return { data, loading };
-}
+      .then(({ data }) => {
+        const seed = seedFromId(marketId);
+        if (data && data.length >= 3) {
+          const real: ChartPoint[] = data.map((d) => ({
+            name: `${d.minute}m`,
+            home: Number(d.prob_home),
+            away: Number(d.prob_away),
+          }));
+          const lastHome = real[real.length - 1]?.home ?? initialProb;
+          oscRef.current  = createOscillator(seed, lastHome);
+          tickRef.current = data.length;
+          setPoints(real.slice(-15));
+        } else {
+          oscRef.current  = createOscillator(seed, initialProb);
+          tickRef.current = 15;
+          setPoints(buildInitialHistory(seed, initialProb));
+        }
+        setLoading(false);
+      });
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [marketId, initialProb]);
 
-function PriceChart({ marketId, labelA, labelB }: { marketId: string; labelA: string; labelB: string }) {
-  const { data, loading } = usePriceHistory(marketId);
-  const chartData = useMemo(() => {
-    if (data.length > 0) return data.map((d) => ({ name: `${d.minute}min`, home: Number(d.prob_home), away: Number(d.prob_away) }));
-    return [0,15,30,45,60,75,90].map((m, i) => { const base = [50,52,54,50,55,57,59]; return { name: `${m}min`, home: base[i], away: 100 - base[i] }; });
-  }, [data]);
-  if (loading) return <div className="h-[110px] flex items-center justify-center text-xs text-muted-foreground">Carregando gráfico...</div>;
+  const tick = useCallback(() => {
+    if (!oscRef.current) return;
+    const home = oscRef.current();
+    const away = Math.round((100 - home) * 10) / 10;
+    tickRef.current += 1;
+    setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home, away }].slice(-20));
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    timerRef.current = setInterval(tick, 3000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [loading, tick]);
+
+  if (loading) {
+    return <div className="h-[110px] flex items-center justify-center text-xs text-muted-foreground">Carregando gráfico...</div>;
+  }
+
+  const lastHome = points[points.length - 1]?.home ?? 50;
+  const lastAway = points[points.length - 1]?.away ?? 50;
+
   return (
     <div className="px-4 pt-3 pb-3">
       <div className="flex items-center gap-4 justify-end mb-1">
-        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="inline-block w-4 h-0.5 bg-emerald-400 rounded" />{labelA}</span>
-        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="inline-block w-4 border-t-2 border-dashed border-red-400" />{labelB}</span>
+        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <span className="inline-block w-4 h-0.5 bg-emerald-400 rounded" />
+          {labelA}
+          <span className="font-bold text-emerald-400 ml-0.5">{lastHome.toFixed(1)}%</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <span className="inline-block w-4 border-t-2 border-dashed border-red-400" />
+          {labelB}
+          <span className="font-bold text-red-400 ml-0.5">{lastAway.toFixed(1)}%</span>
+        </span>
       </div>
       <ResponsiveContainer width="100%" height={110}>
-        <LineChart data={chartData} margin={{ top: 2, right: 6, left: -28, bottom: 0 }}>
-          <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#666" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-          <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: "#666" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-          <Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, fontSize: 11, color: "#e0e0e0" }} labelStyle={{ color: "#888", marginBottom: 2 }} formatter={(value: number, name: string) => [`${Number(value).toFixed(1)}%`, name === "home" ? labelA : labelB]} />
-          <Line type="monotone" dataKey="home" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
-          <Line type="monotone" dataKey="away" stroke="#f87171" strokeWidth={2} dot={false} strokeDasharray="5 3" activeDot={{ r: 3 }} />
+        <LineChart data={points} margin={{ top: 2, right: 6, left: -28, bottom: 0 }}>
+          <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#555" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+          <YAxis domain={[10, 90]} tick={{ fontSize: 9, fill: "#555" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+          <ReferenceLine y={50} stroke="#333" strokeDasharray="3 3" strokeWidth={1} />
+          <Tooltip content={<CustomChartTooltip labelA={labelA} labelB={labelB} />} cursor={{ stroke: "#333", strokeWidth: 1 }} />
+          <Line type="monotoneX" dataKey="home" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3, fill: "#10b981" }} isAnimationActive animationDuration={800} animationEasing="ease-out" />
+          <Line type="monotoneX" dataKey="away" stroke="#f87171" strokeWidth={2} dot={false} strokeDasharray="5 3" activeDot={{ r: 3, fill: "#f87171" }} isAnimationActive animationDuration={800} animationEasing="ease-out" />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
   const [idx, setIdx] = useState(0);
@@ -211,7 +313,8 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           </div>
         </div>
         <div className="flex-1 border-l border-border/30 min-w-0">
-          <PriceChart marketId={featured.id} labelA={labelA} labelB={labelB} />
+          {/* ✅ AnimatedPriceChart substituindo PriceChart estático */}
+          <AnimatedPriceChart marketId={featured.id} labelA={labelA} labelB={labelB} initialProb={yesProb} />
         </div>
       </div>
       <div className="border-t border-border/30 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
@@ -320,9 +423,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
         <h2 className="text-lg font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
 
-      {/* Layout: probabilidades esquerda + gráfico e próximos jogos direita */}
       <div className="flex flex-col md:flex-row items-stretch border-t border-border/30">
-
         {/* ESQUERDA: probabilidades */}
         <div className="flex flex-col justify-between px-4 py-3 w-full md:w-[300px] md:shrink-0">
           <div className="flex items-center text-xs text-muted-foreground mb-3">
@@ -330,8 +431,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
             <span className="w-14 text-center mr-3">Paga fora</span>
             <span className="w-16 text-center">Probabilidades</span>
           </div>
-
-          {/* AJUSTE 02: Time A — sempre silhueta azul */}
           <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               <div className="shrink-0 h-16 w-11 rounded-xl bg-blue-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
@@ -345,8 +444,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               {yesProb}%
             </button>
           </div>
-
-          {/* AJUSTE 02: Time B — sempre silhueta roxa */}
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
               <div className="shrink-0 h-16 w-11 rounded-xl bg-purple-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
@@ -360,18 +457,16 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               {noProb}%
             </button>
           </div>
-
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol((featured as any).volume || 0)} vol</span>
             <span>Espalhe e Total</span>
           </div>
         </div>
 
-        {/* AJUSTE 01: DIREITA — gráfico em cima + próximos jogos embaixo */}
+        {/* DIREITA — gráfico em cima + próximos jogos embaixo */}
         <div className="flex-1 border-l border-border/30 min-w-0 flex flex-col">
-
-          {/* Gráfico de probabilidade */}
-          <PriceChart marketId={featured.id} labelA={teamA} labelB={teamB} />
+          {/* ✅ AnimatedPriceChart substituindo PriceChart estático */}
+          <AnimatedPriceChart marketId={featured.id} labelA={teamA} labelB={teamB} initialProb={yesProb} />
 
           {/* Próximos jogos */}
           <div className="flex-1 border-t border-border/30 p-4">
@@ -410,7 +505,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Footer */}
@@ -589,7 +683,6 @@ function CategoryGrid({ cat, onSelect }: { cat: { key: string; label: string; ic
 function UFCSidebarCard() {
   const navigate = useNavigate();
 
-  // Busca mercado de luta no banco (para o link "Ver mercado")
   const { data: ufcMarket } = useQuery({
     queryKey: ["ufc_next_sidebar"],
     queryFn: async () => {
@@ -606,17 +699,15 @@ function UFCSidebarCard() {
     },
   });
 
-  // Busca próximo evento do UFC via API ESPN
   const { data: espnData } = useQuery({
     queryKey: ["ufc_espn"],
     queryFn: async () => {
       const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard");
       return res.json();
     },
-    staleTime: 1000 * 60 * 10, // cache 10min
+    staleTime: 1000 * 60 * 10,
   });
 
-  // Extrai dados do evento ESPN
   const espnEvent    = espnData?.events?.[0];
   const eventName    = espnEvent?.name || "";
   const eventDate    = espnEvent?.date ? new Date(espnEvent.date) : null;
@@ -624,8 +715,6 @@ function UFCSidebarCard() {
   const dateStr      = isValid ? eventDate!.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
   const timeStr      = isValid ? eventDate!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
   const venue        = espnEvent?.venues?.[0]?.fullName || "";
-
-  // Pega a luta principal (última da lista = main event)
   const competitions = espnEvent?.competitions || [];
   const mainEvent    = competitions[competitions.length - 1];
   const compA        = mainEvent?.competitors?.[0];
@@ -634,7 +723,6 @@ function UFCSidebarCard() {
   const idB          = compB?.id || "";
   const nameA        = compA?.athlete?.shortName || "—";
   const nameB        = compB?.athlete?.shortName || "—";
-  // URL de headshot oficial ESPN para MMA
   const photoA       = idA ? `https://a.espncdn.com/i/headshots/mma/players/full/${idA}.png` : "";
   const photoB       = idB ? `https://a.espncdn.com/i/headshots/mma/players/full/${idB}.png` : "";
   const ufc_logo     = "https://a.espncdn.com/i/teamlogos/leagues/500/ufc.png";
@@ -643,49 +731,30 @@ function UFCSidebarCard() {
 
   return (
     <div className="rounded-xl border border-red-500/30 bg-card overflow-hidden">
-      {/* Header com logo UFC */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-red-500/5">
         <img src={ufc_logo} alt="UFC" className="h-5 w-5 object-contain" />
         <span className="text-[11px] font-bold text-red-400 uppercase tracking-wider">Próximo UFC</span>
         <span className="ml-auto text-[9px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-full">Em breve</span>
       </div>
-
-      {/* Nome do evento */}
       <div className="px-4 pt-3 pb-1">
         <p className="text-[11px] font-bold text-foreground text-center leading-snug line-clamp-2">{eventName || (ufcMarket as any)?.nome}</p>
         {venue && <p className="text-[9px] text-muted-foreground text-center mt-0.5">📍 {venue}</p>}
       </div>
-
-      {/* Fotos reais dos lutadores via ESPN headshots */}
       <div className="flex items-end justify-center gap-2 px-4 pt-2 pb-1">
         <div className="flex flex-col items-center gap-1 flex-1">
           <div className="h-20 w-16 rounded-xl overflow-hidden bg-muted border-2 border-white/20 shadow-md">
-            <img
-              src={photoA}
-              alt={nameA}
-              className="h-full w-full object-cover object-top"
-              onError={(e) => { (e.target as HTMLImageElement).src = "/silhueta1.png"; }}
-            />
+            <img src={photoA} alt={nameA} className="h-full w-full object-cover object-top" onError={(e) => { (e.target as HTMLImageElement).src = "/silhueta1.png"; }} />
           </div>
           <span className="text-[9px] font-semibold text-foreground text-center truncate w-full">{nameA}</span>
         </div>
-
         <span className="text-sm font-black text-red-400 shrink-0 mb-6">VS</span>
-
         <div className="flex flex-col items-center gap-1 flex-1">
           <div className="h-20 w-16 rounded-xl overflow-hidden bg-muted border-2 border-white/20 shadow-md">
-            <img
-              src={photoB}
-              alt={nameB}
-              className="h-full w-full object-cover object-top"
-              onError={(e) => { (e.target as HTMLImageElement).src = "/silhueta2.png"; }}
-            />
+            <img src={photoB} alt={nameB} className="h-full w-full object-cover object-top" onError={(e) => { (e.target as HTMLImageElement).src = "/silhueta2.png"; }} />
           </div>
           <span className="text-[9px] font-semibold text-foreground text-center truncate w-full">{nameB}</span>
         </div>
       </div>
-
-      {/* Data e hora */}
       <div className="px-4 py-2 flex flex-col gap-2">
         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
           <span>📅 {dateStr}</span>
@@ -808,7 +877,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-
       <div className="border-b border-border/50 bg-card/60 sticky top-0 z-20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {CAT_BAR.map((c) => (
