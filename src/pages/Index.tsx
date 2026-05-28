@@ -88,11 +88,6 @@ function fmtVol(v: number | null | undefined) {
 }
 
 // ── AnimatedPriceChart ────────────────────────────────────────────────────────
-// Gráfico animado com:
-// 1. Oscilação orgânica suave (ruído seeded por marketId)
-// 2. "Pulos de compra" simulados — saltos bruscos como na Kalshi
-// 3. Eixo Y à direita com % na faixa de oscilação (zoom dinâmico)
-// 4. Domínio dinâmico que acompanha a faixa atual
 
 interface ChartPoint { name: string; home: number; away: number; }
 
@@ -100,7 +95,6 @@ function seedFromId(id: string): number {
   return id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
 }
 
-// Oscilador orgânico com mean-reversion
 function createOscillator(seed: number, startProb: number) {
   let t     = seed % 1000;
   let prob  = startProb;
@@ -108,7 +102,6 @@ function createOscillator(seed: number, startProb: number) {
   return function next(isBump = false, bumpDir = 1): number {
     t += 1;
     if (isBump) {
-      // Pulo de compra: +3% a +8% na direção da compra
       const bumpSize = 3 + Math.random() * 5;
       prob += bumpDir * bumpSize;
     } else {
@@ -132,7 +125,6 @@ function buildInitialHistory(seed: number, startProb: number): ChartPoint[] {
   }).reverse();
 }
 
-// Calcula domínio dinâmico com padding — zoom na faixa atual
 function calcDomain(points: ChartPoint[]): [number, number] {
   if (!points.length) return [20, 80];
   const vals = points.flatMap((p) => [p.home, p.away]);
@@ -158,7 +150,6 @@ function CustomChartTooltip({ active, payload, labelA, labelB }: any) {
   );
 }
 
-// Notificação flutuante de "compra simulada"
 function BuyNotification({ label, prob, side }: { label: string; prob: number; side: "home" | "away" }) {
   const [visible, setVisible] = useState(true);
   useEffect(() => {
@@ -183,17 +174,28 @@ function BuyNotification({ label, prob, side }: { label: string; prob: number; s
 }
 
 function AnimatedPriceChart({
-  marketId, labelA, labelB, initialProb = 50,
+  marketId, labelA, labelB, initialProb = 50, onProbChange,
 }: {
-  marketId: string; labelA: string; labelB: string; initialProb?: number;
+  marketId: string;
+  labelA: string;
+  labelB: string;
+  initialProb?: number;
+  onProbChange?: (home: number, away: number) => void; // ← novo callback
 }) {
   const [points, setPoints]     = useState<ChartPoint[]>([]);
   const [loading, setLoading]   = useState(true);
   const [notification, setNotification] = useState<{ label: string; prob: number; side: "home" | "away" } | null>(null);
-  const oscRef      = useRef<((isBump?: boolean, bumpDir?: number) => number) | null>(null);
-  const tickRef     = useRef<number>(0);
-  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const oscRef       = useRef<((isBump?: boolean, bumpDir?: number) => number) | null>(null);
+  const tickRef      = useRef<number>(0);
+  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Notifica o pai sempre que os pontos mudam ──────────────────────────────
+  useEffect(() => {
+    if (!points.length) return;
+    const last = points[points.length - 1];
+    onProbChange?.(last.home, last.away);
+  }, [points, onProbChange]);
 
   useEffect(() => {
     if (!marketId) return;
@@ -228,7 +230,6 @@ function AnimatedPriceChart({
     };
   }, [marketId, initialProb]);
 
-  // Tick normal: oscilação suave a cada 3s
   const tick = useCallback(() => {
     if (!oscRef.current) return;
     const home = oscRef.current();
@@ -237,19 +238,16 @@ function AnimatedPriceChart({
     setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home, away }].slice(-25));
   }, []);
 
-  // Bump: pulo de compra simulado a cada 8–22s aleatórios
   const scheduleBump = useCallback(() => {
-    const delay = 8000 + Math.random() * 14000; // 8s a 22s
+    const delay = 8000 + Math.random() * 14000;
     bumpTimerRef.current = setTimeout(() => {
       if (!oscRef.current) { scheduleBump(); return; }
-      // Decide direção: 60% chance de subir (home), 40% descer
       const bumpDir  = Math.random() < 0.6 ? 1 : -1;
       const side     = bumpDir > 0 ? "home" : "away";
       const newHome  = oscRef.current(true, bumpDir);
       const newAway  = Math.round((100 - newHome) * 10) / 10;
       tickRef.current += 1;
       setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home: newHome, away: newAway }].slice(-25));
-      // Mostra notificação flutuante
       setNotification({ label: side === "home" ? labelA : labelB, prob: side === "home" ? newHome : newAway, side });
       setTimeout(() => setNotification(null), 3200);
       scheduleBump();
@@ -276,12 +274,10 @@ function AnimatedPriceChart({
 
   return (
     <div className="px-2 pt-3 pb-2 relative">
-      {/* Notificação de compra simulada */}
       {notification && (
         <BuyNotification label={notification.label} prob={notification.prob} side={notification.side} />
       )}
 
-      {/* Legenda com valores ao vivo */}
       <div className="flex items-center gap-3 justify-start mb-1 px-2">
         <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span className="inline-block w-3 h-0.5 bg-emerald-400 rounded" />
@@ -304,7 +300,6 @@ function AnimatedPriceChart({
             axisLine={false}
             interval="preserveStartEnd"
           />
-          {/* Eixo Y à DIREITA com zoom dinâmico — igual Kalshi */}
           <YAxis
             orientation="right"
             domain={[domMin, domMax]}
@@ -315,7 +310,6 @@ function AnimatedPriceChart({
             tickCount={5}
             width={38}
           />
-          {/* Linha de referência no meio do domínio */}
           <ReferenceLine
             y={Math.round((domMin + domMax) / 2)}
             stroke="#2a2a2a"
@@ -352,7 +346,6 @@ function AnimatedPriceChart({
         </LineChart>
       </ResponsiveContainer>
 
-      {/* CSS para animação fade da notificação */}
       <style>{`
         @keyframes fadeInOut {
           0%   { opacity: 0; transform: translateY(-4px); }
@@ -505,6 +498,20 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
   const noOdds  = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
 
+  // ── Estado live das probabilidades sincronizado com o gráfico ──────────────
+  const [liveProb, setLiveProb] = useState({ home: yesProb, away: noProb });
+
+  // Reseta quando o card muda (usuário clica nas setas)
+  useEffect(() => {
+    setLiveProb({ home: yesProb, away: noProb });
+  }, [featured.id, yesProb, noProb]);
+
+  // Callback estável para receber updates do gráfico
+  const handleProbChange = useCallback((home: number, away: number) => {
+    setLiveProb({ home, away });
+  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
+
   return (
     <div className={`rounded-2xl border bg-card overflow-hidden ${isLive ? "border-red-500/50" : "border-violet-500/20"}`}>
       <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/40">
@@ -547,7 +554,10 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
+            {/* ← Agora usa liveProb.home em vez de yesProb estático */}
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
+              {liveProb.home.toFixed(1)}%
+            </button>
           </div>
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
@@ -557,7 +567,10 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
+            {/* ← Agora usa liveProb.away em vez de noProb estático */}
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
+              {liveProb.away.toFixed(1)}%
+            </button>
           </div>
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol((featured as any).volume || 0)} vol</span>
@@ -565,7 +578,14 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           </div>
         </div>
         <div className="flex-1 border-l border-border/30 min-w-0 flex flex-col">
-          <AnimatedPriceChart marketId={featured.id} labelA={teamA} labelB={teamB} initialProb={yesProb} />
+          {/* ← Passa o callback onProbChange para o gráfico */}
+          <AnimatedPriceChart
+            marketId={featured.id}
+            labelA={teamA}
+            labelB={teamB}
+            initialProb={yesProb}
+            onProbChange={handleProbChange}
+          />
           <div className="flex-1 border-t border-border/30 p-4">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Próximos jogos</p>
             <div className="flex flex-col gap-2">
