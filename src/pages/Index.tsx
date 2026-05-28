@@ -13,7 +13,10 @@ import {
   Clapperboard, CloudSun, BarChart2, Globe,
 } from "lucide-react";
 import { extractTeamsFromTitle } from "@/lib/teamLogos";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ReferenceLine,
+} from "recharts";
 
 const CATEGORIES = [
   { key: "esportes",       label: "Esportiva",   icon: Trophy,       color: "text-orange-400" },
@@ -31,7 +34,6 @@ const CAT_BAR = [
   "Empresas","Financeiros","Tecnologia e Ciência",
 ];
 
-// ── hook: opções de mercados multiplo/periodo ─────────────────────────────────
 function useOpcoesMercado(marketId: string, enabled: boolean) {
   return useQuery({
     queryKey: ["opcoes_mercado", marketId],
@@ -86,10 +88,11 @@ function fmtVol(v: number | null | undefined) {
 }
 
 // ── AnimatedPriceChart ────────────────────────────────────────────────────────
-// Gráfico com movimento orgânico em tempo real (fake/animado).
-// Tenta usar dados reais de price_history; se não houver, gera histórico
-// animado com oscilador seeded pelo marketId — cada mercado tem sua
-// própria "personalidade" de movimento.
+// Gráfico animado com:
+// 1. Oscilação orgânica suave (ruído seeded por marketId)
+// 2. "Pulos de compra" simulados — saltos bruscos como na Kalshi
+// 3. Eixo Y à direita com % na faixa de oscilação (zoom dinâmico)
+// 4. Domínio dinâmico que acompanha a faixa atual
 
 interface ChartPoint { name: string; home: number; away: number; }
 
@@ -97,35 +100,55 @@ function seedFromId(id: string): number {
   return id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
 }
 
+// Oscilador orgânico com mean-reversion
 function createOscillator(seed: number, startProb: number) {
   let t     = seed % 1000;
   let prob  = startProb;
   let trend = Math.sin(seed) * 0.3;
-  return function next(): number {
+  return function next(isBump = false, bumpDir = 1): number {
     t += 1;
-    const slow    = Math.sin(t * 0.08 + seed) * 1.8;
-    const fast    = Math.sin(t * 0.31 + seed * 2.1) * 0.9;
-    trend        += (Math.random() - 0.505) * 0.04;
-    trend         = Math.max(-0.6, Math.min(0.6, trend));
-    const meanRev = (startProb - prob) * 0.018;
-    prob         += slow * 0.12 + fast * 0.08 + trend + meanRev;
-    prob          = Math.max(15, Math.min(85, prob));
+    if (isBump) {
+      // Pulo de compra: +3% a +8% na direção da compra
+      const bumpSize = 3 + Math.random() * 5;
+      prob += bumpDir * bumpSize;
+    } else {
+      const slow    = Math.sin(t * 0.08 + seed) * 1.8;
+      const fast    = Math.sin(t * 0.31 + seed * 2.1) * 0.9;
+      trend        += (Math.random() - 0.505) * 0.04;
+      trend         = Math.max(-0.6, Math.min(0.6, trend));
+      const meanRev = (startProb - prob) * 0.018;
+      prob         += slow * 0.12 + fast * 0.08 + trend + meanRev;
+    }
+    prob = Math.max(15, Math.min(85, prob));
     return Math.round(prob * 10) / 10;
   };
 }
 
 function buildInitialHistory(seed: number, startProb: number): ChartPoint[] {
   const osc = createOscillator(seed, startProb);
-  return Array.from({ length: 15 }, (_, i) => {
+  return Array.from({ length: 20 }, (_, i) => {
     const home = osc();
-    return { name: `${14 - i}m`, home, away: Math.round((100 - home) * 10) / 10 };
+    return { name: `${20 - i}m`, home, away: Math.round((100 - home) * 10) / 10 };
   }).reverse();
+}
+
+// Calcula domínio dinâmico com padding — zoom na faixa atual
+function calcDomain(points: ChartPoint[]): [number, number] {
+  if (!points.length) return [20, 80];
+  const vals = points.flatMap((p) => [p.home, p.away]);
+  const min  = Math.min(...vals);
+  const max  = Math.max(...vals);
+  const pad  = Math.max(6, (max - min) * 0.3);
+  return [
+    Math.max(0,   Math.floor(min - pad)),
+    Math.min(100, Math.ceil(max  + pad)),
+  ];
 }
 
 function CustomChartTooltip({ active, payload, labelA, labelB }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: "#111", border: "1px solid #222", borderRadius: 8, padding: "6px 10px", fontSize: 11, color: "#e0e0e0" }}>
+    <div style={{ background: "#111", border: "1px solid #2a2a2a", borderRadius: 8, padding: "6px 10px", fontSize: 11, color: "#e0e0e0" }}>
       {payload.map((p: any) => (
         <div key={p.dataKey} style={{ color: p.stroke, marginBottom: 2 }}>
           {p.dataKey === "home" ? labelA : labelB}: <b>{Number(p.value).toFixed(1)}%</b>
@@ -135,22 +158,42 @@ function CustomChartTooltip({ active, payload, labelA, labelB }: any) {
   );
 }
 
+// Notificação flutuante de "compra simulada"
+function BuyNotification({ label, prob, side }: { label: string; prob: number; side: "home" | "away" }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(false), 2800);
+    return () => clearTimeout(t);
+  }, []);
+  if (!visible) return null;
+  const color = side === "home" ? "#10b981" : "#f87171";
+  return (
+    <div style={{
+      position: "absolute", top: 6, right: 8, zIndex: 10,
+      background: "#111", border: `1px solid ${color}40`,
+      borderRadius: 8, padding: "4px 8px", fontSize: 10,
+      color, display: "flex", alignItems: "center", gap: 4,
+      animation: "fadeInOut 2.8s ease forwards",
+      pointerEvents: "none",
+    }}>
+      <span>↑</span>
+      <span>Alguém comprou <b>{label}</b> → {prob.toFixed(1)}%</span>
+    </div>
+  );
+}
+
 function AnimatedPriceChart({
-  marketId,
-  labelA,
-  labelB,
-  initialProb = 50,
+  marketId, labelA, labelB, initialProb = 50,
 }: {
-  marketId: string;
-  labelA: string;
-  labelB: string;
-  initialProb?: number;
+  marketId: string; labelA: string; labelB: string; initialProb?: number;
 }) {
-  const [points, setPoints]   = useState<ChartPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const oscRef   = useRef<(() => number) | null>(null);
-  const tickRef  = useRef<number>(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [points, setPoints]     = useState<ChartPoint[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [notification, setNotification] = useState<{ label: string; prob: number; side: "home" | "away" } | null>(null);
+  const oscRef      = useRef<((isBump?: boolean, bumpDir?: number) => number) | null>(null);
+  const tickRef     = useRef<number>(0);
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!marketId) return;
@@ -171,62 +214,153 @@ function AnimatedPriceChart({
           const lastHome = real[real.length - 1]?.home ?? initialProb;
           oscRef.current  = createOscillator(seed, lastHome);
           tickRef.current = data.length;
-          setPoints(real.slice(-15));
+          setPoints(real.slice(-20));
         } else {
           oscRef.current  = createOscillator(seed, initialProb);
-          tickRef.current = 15;
+          tickRef.current = 20;
           setPoints(buildInitialHistory(seed, initialProb));
         }
         setLoading(false);
       });
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current)    clearInterval(timerRef.current);
+      if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
+    };
   }, [marketId, initialProb]);
 
+  // Tick normal: oscilação suave a cada 3s
   const tick = useCallback(() => {
     if (!oscRef.current) return;
     const home = oscRef.current();
     const away = Math.round((100 - home) * 10) / 10;
     tickRef.current += 1;
-    setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home, away }].slice(-20));
+    setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home, away }].slice(-25));
   }, []);
+
+  // Bump: pulo de compra simulado a cada 8–22s aleatórios
+  const scheduleBump = useCallback(() => {
+    const delay = 8000 + Math.random() * 14000; // 8s a 22s
+    bumpTimerRef.current = setTimeout(() => {
+      if (!oscRef.current) { scheduleBump(); return; }
+      // Decide direção: 60% chance de subir (home), 40% descer
+      const bumpDir  = Math.random() < 0.6 ? 1 : -1;
+      const side     = bumpDir > 0 ? "home" : "away";
+      const newHome  = oscRef.current(true, bumpDir);
+      const newAway  = Math.round((100 - newHome) * 10) / 10;
+      tickRef.current += 1;
+      setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home: newHome, away: newAway }].slice(-25));
+      // Mostra notificação flutuante
+      setNotification({ label: side === "home" ? labelA : labelB, prob: side === "home" ? newHome : newAway, side });
+      setTimeout(() => setNotification(null), 3200);
+      scheduleBump();
+    }, delay);
+  }, [labelA, labelB]);
 
   useEffect(() => {
     if (loading) return;
     timerRef.current = setInterval(tick, 3000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [loading, tick]);
+    scheduleBump();
+    return () => {
+      if (timerRef.current)    clearInterval(timerRef.current);
+      if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
+    };
+  }, [loading, tick, scheduleBump]);
 
   if (loading) {
-    return <div className="h-[110px] flex items-center justify-center text-xs text-muted-foreground">Carregando gráfico...</div>;
+    return <div className="h-[130px] flex items-center justify-center text-xs text-muted-foreground">Carregando gráfico...</div>;
   }
 
+  const [domMin, domMax] = calcDomain(points);
   const lastHome = points[points.length - 1]?.home ?? 50;
   const lastAway = points[points.length - 1]?.away ?? 50;
 
   return (
-    <div className="px-4 pt-3 pb-3">
-      <div className="flex items-center gap-4 justify-end mb-1">
+    <div className="px-2 pt-3 pb-2 relative">
+      {/* Notificação de compra simulada */}
+      {notification && (
+        <BuyNotification label={notification.label} prob={notification.prob} side={notification.side} />
+      )}
+
+      {/* Legenda com valores ao vivo */}
+      <div className="flex items-center gap-3 justify-start mb-1 px-2">
         <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span className="inline-block w-4 h-0.5 bg-emerald-400 rounded" />
+          <span className="inline-block w-3 h-0.5 bg-emerald-400 rounded" />
           {labelA}
           <span className="font-bold text-emerald-400 ml-0.5">{lastHome.toFixed(1)}%</span>
         </span>
         <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <span className="inline-block w-4 border-t-2 border-dashed border-red-400" />
+          <span className="inline-block w-3 border-t-2 border-dashed border-red-400" />
           {labelB}
           <span className="font-bold text-red-400 ml-0.5">{lastAway.toFixed(1)}%</span>
         </span>
       </div>
-      <ResponsiveContainer width="100%" height={110}>
-        <LineChart data={points} margin={{ top: 2, right: 6, left: -28, bottom: 0 }}>
-          <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#555" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-          <YAxis domain={[10, 90]} tick={{ fontSize: 9, fill: "#555" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-          <ReferenceLine y={50} stroke="#333" strokeDasharray="3 3" strokeWidth={1} />
-          <Tooltip content={<CustomChartTooltip labelA={labelA} labelB={labelB} />} cursor={{ stroke: "#333", strokeWidth: 1 }} />
-          <Line type="monotoneX" dataKey="home" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3, fill: "#10b981" }} isAnimationActive animationDuration={800} animationEasing="ease-out" />
-          <Line type="monotoneX" dataKey="away" stroke="#f87171" strokeWidth={2} dot={false} strokeDasharray="5 3" activeDot={{ r: 3, fill: "#f87171" }} isAnimationActive animationDuration={800} animationEasing="ease-out" />
+
+      <ResponsiveContainer width="100%" height={120}>
+        <LineChart data={points} margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
+          <XAxis
+            dataKey="name"
+            tick={{ fontSize: 8, fill: "#444" }}
+            tickLine={false}
+            axisLine={false}
+            interval="preserveStartEnd"
+          />
+          {/* Eixo Y à DIREITA com zoom dinâmico — igual Kalshi */}
+          <YAxis
+            orientation="right"
+            domain={[domMin, domMax]}
+            tick={{ fontSize: 9, fill: "#555" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => `${v}%`}
+            tickCount={5}
+            width={38}
+          />
+          {/* Linha de referência no meio do domínio */}
+          <ReferenceLine
+            y={Math.round((domMin + domMax) / 2)}
+            stroke="#2a2a2a"
+            strokeDasharray="3 3"
+            strokeWidth={1}
+          />
+          <Tooltip
+            content={<CustomChartTooltip labelA={labelA} labelB={labelB} />}
+            cursor={{ stroke: "#333", strokeWidth: 1 }}
+          />
+          <Line
+            type="monotoneX"
+            dataKey="home"
+            stroke="#10b981"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 3, fill: "#10b981" }}
+            isAnimationActive
+            animationDuration={600}
+            animationEasing="ease-out"
+          />
+          <Line
+            type="monotoneX"
+            dataKey="away"
+            stroke="#f87171"
+            strokeWidth={2}
+            dot={false}
+            strokeDasharray="5 3"
+            activeDot={{ r: 3, fill: "#f87171" }}
+            isAnimationActive
+            animationDuration={600}
+            animationEasing="ease-out"
+          />
         </LineChart>
       </ResponsiveContainer>
+
+      {/* CSS para animação fade da notificação */}
+      <style>{`
+        @keyframes fadeInOut {
+          0%   { opacity: 0; transform: translateY(-4px); }
+          15%  { opacity: 1; transform: translateY(0); }
+          75%  { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -313,7 +447,6 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           </div>
         </div>
         <div className="flex-1 border-l border-border/30 min-w-0">
-          {/* ✅ AnimatedPriceChart substituindo PriceChart estático */}
           <AnimatedPriceChart marketId={featured.id} labelA={labelA} labelB={labelB} initialProb={yesProb} />
         </div>
       </div>
@@ -333,12 +466,8 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
   );
 }
 
-// ── OtherSportsFeaturedCard: Basquete, MMA, Vôlei, Tênis ────────────────────────
 const SPORT_ICONS: Record<string, string> = {
-  basquete: "🏀",
-  luta:     "🥊",
-  volei:    "🏐",
-  tenis:    "🎾",
+  basquete: "🏀", luta: "🥊", volei: "🏐", tenis: "🎾",
 };
 
 const SPORT_COLORS: Record<string, string> = {
@@ -378,53 +507,32 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
 
   return (
     <div className={`rounded-2xl border bg-card overflow-hidden ${isLive ? "border-red-500/50" : "border-violet-500/20"}`}>
-      {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border/40">
         <div className="flex items-center gap-2 flex-wrap">
           {isLive ? (
             <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-400 bg-red-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-red-500/30">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-              </span>
-              AO VIVO
+              <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" /></span>AO VIVO
             </span>
           ) : isToday ? (
             <span className="flex items-center gap-1.5 text-[10px] font-bold text-orange-400 bg-orange-400/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-orange-500/30">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
-              </span>
-              HOJE
+              <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" /></span>HOJE
             </span>
           ) : null}
           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${colorCls}`}>
             {icon} {category.charAt(0).toUpperCase() + category.slice(1)}
           </span>
-          <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1 rounded-full">
-            📅 {dateLabel} · ⏰ {timeLabel}
-          </span>
+          <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1 rounded-full">📅 {dateLabel} · ⏰ {timeLabel}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIdx((i) => (i - 1 + markets.length) % markets.length)}
-            className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors">
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
+          <button onClick={() => setIdx((i) => (i - 1 + markets.length) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronLeft className="h-3.5 w-3.5" /></button>
           <span className="text-xs text-muted-foreground min-w-[50px] text-center">{idx + 1} de {markets.length}</span>
-          <button onClick={() => setIdx((i) => (i + 1) % markets.length)}
-            className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors">
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+          <button onClick={() => setIdx((i) => (i + 1) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
         </div>
       </div>
-
-      {/* Título */}
       <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
         <h2 className="text-lg font-bold text-foreground leading-snug hover:text-primary transition-colors">{title}</h2>
       </div>
-
       <div className="flex flex-col md:flex-row items-stretch border-t border-border/30">
-        {/* ESQUERDA: probabilidades */}
         <div className="flex flex-col justify-between px-4 py-3 w-full md:w-[300px] md:shrink-0">
           <div className="flex items-center text-xs text-muted-foreground mb-3">
             <span className="flex-1">Mercado</span>
@@ -439,10 +547,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-            <button onClick={() => onSelect(featured)}
-              className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
-              {yesProb}%
-            </button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
           </div>
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
@@ -452,42 +557,28 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-            <button onClick={() => onSelect(featured)}
-              className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
-              {noProb}%
-            </button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
           </div>
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol((featured as any).volume || 0)} vol</span>
             <span>Espalhe e Total</span>
           </div>
         </div>
-
-        {/* DIREITA — gráfico em cima + próximos jogos embaixo */}
         <div className="flex-1 border-l border-border/30 min-w-0 flex flex-col">
-          {/* ✅ AnimatedPriceChart substituindo PriceChart estático */}
           <AnimatedPriceChart marketId={featured.id} labelA={teamA} labelB={teamB} initialProb={yesProb} />
-
-          {/* Próximos jogos */}
           <div className="flex-1 border-t border-border/30 p-4">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Próximos jogos
-            </p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Próximos jogos</p>
             <div className="flex flex-col gap-2">
               {markets.slice(0, 3).map((m, i) => {
-                const t   = (m as any).nome || m.title || "";
-                const d   = new Date((m as any).end_date || "");
-                const dl  = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-                const tl  = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                const t  = (m as any).nome || m.title || "";
+                const d  = new Date((m as any).end_date || "");
+                const dl = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+                const tl = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                 const ico = SPORT_ICONS[m.category] || "🏆";
                 const isCurrent = i === idx;
                 return (
-                  <div key={m.id}
-                    onClick={() => setIdx(i)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all
-                      ${isCurrent
-                        ? "bg-primary/10 border border-primary/30"
-                        : "hover:bg-muted/40 border border-transparent"}`}>
+                  <div key={m.id} onClick={() => setIdx(i)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${isCurrent ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/40 border border-transparent"}`}>
                     <span className="text-base shrink-0">{ico}</span>
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs font-medium truncate ${isCurrent ? "text-primary" : "text-foreground"}`}>{t}</p>
@@ -497,17 +588,11 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
                   </div>
                 );
               })}
-              {markets.length > 3 && (
-                <p className="text-[10px] text-muted-foreground text-center pt-1">
-                  +{markets.length - 3} jogos
-                </p>
-              )}
+              {markets.length > 3 && <p className="text-[10px] text-muted-foreground text-center pt-1">+{markets.length - 3} jogos</p>}
             </div>
           </div>
         </div>
       </div>
-
-      {/* Footer */}
       <div className="border-t border-border/30 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
         {[
           { icon: "📋", title: "Mercados sobre monopólios",  sub: "Como os mercados justos protegem os consumidores" },
@@ -516,10 +601,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
         ].map((p) => (
           <div key={p.title} className="flex items-start gap-2 px-4 py-3 hover:bg-yellow-500/5 cursor-pointer transition-colors">
             <div className="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-sm shrink-0 mt-0.5">{p.icon}</div>
-            <div>
-              <div className="text-[11px] font-semibold text-yellow-400 leading-tight">{p.title}</div>
-              <div className="text-[10px] text-muted-foreground mt-0.5">{p.sub}</div>
-            </div>
+            <div><div className="text-[11px] font-semibold text-yellow-400 leading-tight">{p.title}</div><div className="text-[10px] text-muted-foreground mt-0.5">{p.sub}</div></div>
           </div>
         ))}
       </div>
@@ -527,7 +609,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   );
 }
 
-// ── CategoryMiniCard: suporta binario, multiplo e periodo ─────────────────────
 function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m: DBMarket) => void }) {
   const navigate    = useNavigate();
   const { title, yesProb, noProb, dateLabel } = getMarketInfo(market);
@@ -540,8 +621,7 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
 
   if (tipoMercado === "multiplo") {
     return (
-      <div onClick={() => navigate(`/mercado/${market.id}`)}
-        className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3">
+      <div onClick={() => navigate(`/mercado/${market.id}`)} className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">{(market as any).category || ""}</span>
           {dateLabel && <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{dateLabel}</span>}
@@ -550,28 +630,13 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
         <div className="flex flex-col gap-2">
           {(opcoes as any[]).slice(0, 3).map((op) => (
             <div key={op.id} className="flex items-center gap-3 py-2 px-2 rounded-lg bg-muted/20 border border-border/30 hover:border-primary/30 transition-all">
-              {op.foto_url ? (
-                <img src={op.foto_url} alt={op.label}
-                  className="h-12 w-12 rounded-lg object-cover border-2 border-border/40 shrink-0"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = "none";
-                    const sibling = target.nextElementSibling as HTMLElement;
-                    if (sibling) sibling.style.display = "flex";
-                  }} />
-              ) : null}
-              <div className="h-12 w-12 rounded-lg bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0"
-                style={{ display: op.foto_url ? "none" : "flex" }}>
-                {op.label.slice(0, 1).toUpperCase()}
-              </div>
+              {op.foto_url ? <img src={op.foto_url} alt={op.label} className="h-12 w-12 rounded-lg object-cover border-2 border-border/40 shrink-0" onError={(e) => { const t = e.target as HTMLImageElement; t.style.display="none"; const s = t.nextElementSibling as HTMLElement; if(s) s.style.display="flex"; }} /> : null}
+              <div className="h-12 w-12 rounded-lg bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0" style={{ display: op.foto_url ? "none" : "flex" }}>{op.label.slice(0,1).toUpperCase()}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{op.label}</p>
                 {op.descricao && <p className="text-[10px] text-muted-foreground truncate">{op.descricao}</p>}
               </div>
-              <button onClick={(e) => { e.stopPropagation(); onSelect(market); }}
-                className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors shrink-0">
-                {op.probabilidade}%
-              </button>
+              <button onClick={(e) => { e.stopPropagation(); onSelect(market); }} className="text-sm font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-lg hover:bg-primary/20 transition-colors shrink-0">{op.probabilidade}%</button>
             </div>
           ))}
         </div>
@@ -586,8 +651,7 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
   if (tipoMercado === "periodo") {
     const maxProb = Math.max(...(opcoes as any[]).map((o) => Number(o.probabilidade) || 0), 0);
     return (
-      <div onClick={() => navigate(`/mercado/${market.id}`)}
-        className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3">
+      <div onClick={() => navigate(`/mercado/${market.id}`)} className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3">
         <div className="flex items-center gap-2">
           {imageUrl && <img src={imageUrl} alt={title} className="w-8 h-8 rounded-lg object-cover bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />}
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">{(market as any).category || ""}</span>
@@ -601,10 +665,7 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
             return (
               <div key={op.id} className={`flex items-center justify-between py-1.5 px-2 rounded-lg border transition-all ${isLeading ? "bg-primary/10 border-primary/30" : "bg-muted/20 border-border/40"}`}>
                 <span className="text-xs text-foreground truncate flex-1">{op.label}</span>
-                <button onClick={(e) => { e.stopPropagation(); onSelect(market); }}
-                  className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ml-2 ${isLeading ? "text-primary bg-primary/10 border border-primary/20" : "text-muted-foreground bg-muted/30 border border-border/40"}`}>
-                  {prob}%
-                </button>
+                <button onClick={(e) => { e.stopPropagation(); onSelect(market); }} className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 ml-2 ${isLeading ? "text-primary bg-primary/10 border border-primary/20" : "text-muted-foreground bg-muted/30 border border-border/40"}`}>{prob}%</button>
               </div>
             );
           })}
@@ -622,16 +683,9 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
   const optB  = parts[1]?.trim().split(/[:\-–—]/)[0].trim() || "Não";
 
   return (
-    <div onClick={() => navigate(`/mercado/${market.id}`)}
-      className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3">
+    <div onClick={() => navigate(`/mercado/${market.id}`)} className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent/30 transition-colors flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        {imageUrl ? (
-          <img src={imageUrl} alt={title} className="w-12 h-12 rounded-lg object-cover bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        ) : (
-          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-muted-foreground">{title.slice(0, 2).toUpperCase()}</span>
-          </div>
-        )}
+        {imageUrl ? <img src={imageUrl} alt={title} className="w-12 h-12 rounded-lg object-cover bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0"><span className="text-xs font-bold text-muted-foreground">{title.slice(0,2).toUpperCase()}</span></div>}
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">{(market as any).category || ""}</span>
         {dateLabel && <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{dateLabel}</span>}
       </div>
@@ -682,53 +736,36 @@ function CategoryGrid({ cat, onSelect }: { cat: { key: string; label: string; ic
 
 function UFCSidebarCard() {
   const navigate = useNavigate();
-
   const { data: ufcMarket } = useQuery({
     queryKey: ["ufc_next_sidebar"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("markets")
-        .select("id, nome, end_date, yes_prob")
-        .eq("category", "luta")
-        .eq("status", "active")
-        .order("end_date", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.from("markets").select("id, nome, end_date, yes_prob").eq("category", "luta").eq("status", "active").order("end_date", { ascending: true }).limit(1).maybeSingle();
       if (error) throw error;
       return data;
     },
   });
-
   const { data: espnData } = useQuery({
     queryKey: ["ufc_espn"],
-    queryFn: async () => {
-      const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard");
-      return res.json();
-    },
+    queryFn: async () => { const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"); return res.json(); },
     staleTime: 1000 * 60 * 10,
   });
-
-  const espnEvent    = espnData?.events?.[0];
-  const eventName    = espnEvent?.name || "";
-  const eventDate    = espnEvent?.date ? new Date(espnEvent.date) : null;
-  const isValid      = eventDate && !isNaN(eventDate.getTime());
-  const dateStr      = isValid ? eventDate!.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
-  const timeStr      = isValid ? eventDate!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
-  const venue        = espnEvent?.venues?.[0]?.fullName || "";
+  const espnEvent = espnData?.events?.[0];
+  const eventName = espnEvent?.name || "";
+  const eventDate = espnEvent?.date ? new Date(espnEvent.date) : null;
+  const isValid   = eventDate && !isNaN(eventDate.getTime());
+  const dateStr   = isValid ? eventDate!.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+  const timeStr   = isValid ? eventDate!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+  const venue     = espnEvent?.venues?.[0]?.fullName || "";
   const competitions = espnEvent?.competitions || [];
-  const mainEvent    = competitions[competitions.length - 1];
-  const compA        = mainEvent?.competitors?.[0];
-  const compB        = mainEvent?.competitors?.[1];
-  const idA          = compA?.id || "";
-  const idB          = compB?.id || "";
-  const nameA        = compA?.athlete?.shortName || "—";
-  const nameB        = compB?.athlete?.shortName || "—";
-  const photoA       = idA ? `https://a.espncdn.com/i/headshots/mma/players/full/${idA}.png` : "";
-  const photoB       = idB ? `https://a.espncdn.com/i/headshots/mma/players/full/${idB}.png` : "";
-  const ufc_logo     = "https://a.espncdn.com/i/teamlogos/leagues/500/ufc.png";
-
+  const mainEvent = competitions[competitions.length - 1];
+  const compA = mainEvent?.competitors?.[0];
+  const compB = mainEvent?.competitors?.[1];
+  const idA = compA?.id || ""; const idB = compB?.id || "";
+  const nameA = compA?.athlete?.shortName || "—"; const nameB = compB?.athlete?.shortName || "—";
+  const photoA = idA ? `https://a.espncdn.com/i/headshots/mma/players/full/${idA}.png` : "";
+  const photoB = idB ? `https://a.espncdn.com/i/headshots/mma/players/full/${idB}.png` : "";
+  const ufc_logo = "https://a.espncdn.com/i/teamlogos/leagues/500/ufc.png";
   if (!espnEvent && !ufcMarket) return null;
-
   return (
     <div className="rounded-xl border border-red-500/30 bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-red-500/5">
@@ -757,15 +794,9 @@ function UFCSidebarCard() {
       </div>
       <div className="px-4 py-2 flex flex-col gap-2">
         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>📅 {dateStr}</span>
-          <span>⏰ {timeStr}</span>
+          <span>📅 {dateStr}</span><span>⏰ {timeStr}</span>
         </div>
-        <button
-          onClick={() => ufcMarket && navigate(`/mercado/${ufcMarket.id}`)}
-          className="w-full py-1.5 rounded-lg text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors"
-        >
-          Ver mercado →
-        </button>
+        <button onClick={() => ufcMarket && navigate(`/mercado/${ufcMarket.id}`)} className="w-full py-1.5 rounded-lg text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors">Ver mercado →</button>
       </div>
     </div>
   );
@@ -849,30 +880,16 @@ const Index = () => {
   const activeMarkets   = useMemo(() => { if (!allMarkets) return []; return filterActive(allMarkets); }, [allMarkets]);
   const sportsMarkets   = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
   const otherCategories = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
-
   const otherSportsMarkets = useMemo(() => {
-    const now    = new Date();
-    const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-    return activeMarkets
-      .filter((m) => ["basquete", "luta", "volei", "tenis"].includes(m.category))
-      .filter((m) => {
-        const d = new Date((m as any).end_date || (m as any).event_date || "");
-        return !isNaN(d.getTime()) && d >= now && d <= limite;
-      })
-      .sort((a, b) => {
-        const da = new Date((a as any).end_date || "").getTime();
-        const db = new Date((b as any).end_date || "").getTime();
-        return da - db;
-      });
+    const now = new Date(); const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    return activeMarkets.filter((m) => ["basquete", "luta", "volei", "tenis"].includes(m.category)).filter((m) => { const d = new Date((m as any).end_date || (m as any).event_date || ""); return !isNaN(d.getTime()) && d >= now && d <= limite; }).sort((a, b) => new Date((a as any).end_date || "").getTime() - new Date((b as any).end_date || "").getTime());
   }, [activeMarkets]);
-
   const displayMarkets = useMemo(() => {
     let base = activeMarkets;
     if (activeCategory !== "todos") base = base.filter((m) => m.category === activeCategory);
     if (search) base = base.filter((m) => ((m as any).nome || m.title || "").toLowerCase().includes(search.toLowerCase()));
     return base.sort((a, b) => b.volume - a.volume);
   }, [activeMarkets, activeCategory, search]);
-
   const isSearching = !!search || activeCategory !== "todos";
 
   return (
@@ -880,14 +897,10 @@ const Index = () => {
       <div className="border-b border-border/50 bg-card/60 sticky top-0 z-20 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {CAT_BAR.map((c) => (
-            <button key={c} onClick={() => setActiveCatBar(c)}
-              className={`shrink-0 text-xs px-3 py-3 border-b-2 transition-all whitespace-nowrap ${activeCatBar === c ? "border-primary text-foreground font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-              {c}
-            </button>
+            <button key={c} onClick={() => setActiveCatBar(c)} className={`shrink-0 text-xs px-3 py-3 border-b-2 transition-all whitespace-nowrap ${activeCatBar === c ? "border-primary text-foreground font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{c}</button>
           ))}
         </div>
       </div>
-
       <div className="max-w-6xl mx-auto px-4 py-5">
         <div className="flex flex-wrap items-center gap-3 mb-5">
           <div className="relative w-full sm:max-w-sm">
@@ -897,23 +910,21 @@ const Index = () => {
           <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             <button onClick={() => setActiveCategory("todos")} className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${activeCategory === "todos" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>Todos</button>
             {CATEGORIES.map((cat) => (
-              <button key={cat.key} onClick={() => setActiveCategory(cat.key)}
-                className={`shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${activeCategory === cat.key ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
+              <button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${activeCategory === cat.key ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
                 <cat.icon className={`h-3 w-3 ${activeCategory === cat.key ? "text-primary-foreground" : cat.color}`} />
                 {cat.label}
               </button>
             ))}
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5">
           <div>
             {isLoading ? (
               <div className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => <MarketCardSkeleton key={i} />)}</div>
             ) : isSearching ? (
-              displayMarkets.length === 0 ? (
-                <div className="text-center py-20 text-muted-foreground"><Globe className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>Nenhum mercado encontrado.</p></div>
-              ) : <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
+              displayMarkets.length === 0
+                ? <div className="text-center py-20 text-muted-foreground"><Globe className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>Nenhum mercado encontrado.</p></div>
+                : <FeaturedCard markets={displayMarkets} onSelect={setSelectedMarket} />
             ) : (
               <div className="flex flex-col gap-8">
                 {otherSportsMarkets.length > 0 && (
@@ -944,7 +955,6 @@ const Index = () => {
           <div className="hidden lg:block"><Sidebar markets={activeMarkets} /></div>
         </div>
       </div>
-
       <TradingDrawer market={selectedMarket} open={!!selectedMarket} onClose={() => setSelectedMarket(null)} posicoes={posicoes} />
     </div>
   );
