@@ -39,10 +39,7 @@ function useOpcoesMercado(marketId: string, enabled: boolean) {
     queryKey: ["opcoes_mercado", marketId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("opcoes_mercado")
-        .select("*")
-        .eq("market_id", marketId)
-        .order("ordem", { ascending: true });
+        .from("opcoes_mercado").select("*").eq("market_id", marketId).order("ordem", { ascending: true });
       if (error) throw error;
       return data || [];
     },
@@ -50,28 +47,29 @@ function useOpcoesMercado(marketId: string, enabled: boolean) {
   });
 }
 
-// Retorna a data do mercado usando os nomes corretos do banco
+// ✅ FIX PRINCIPAL: lê TODOS os campos de data possíveis do banco
+// O script salva como event_date / end_date
+// Versões antigas usam data_do_evento / data_final
 function getMarketDate(m: any): Date | null {
-  const str = m.data_final || m.data_do_evento || "";
+  const str =
+    m.event_date    ||   // ✅ campo salvo pelo fetch-jogos (NBA, MMA, Tênis, Futebol)
+    m.end_date      ||   // ✅ campo salvo pelo fetch-jogos como fallback
+    m.data_do_evento ||  // campo de versões antigas
+    m.data_final    ||   // campo de versões antigas
+    "";
+  if (!str) return null;
   const d = new Date(str);
   return isNaN(d.getTime()) ? null : d;
 }
 
-// Mercado fica visível:
-// - status "resolvido" → sempre oculto
-// - sem data → sempre visível
-// - com data → visível desde 30min antes até 5h depois do horário marcado
 function filterActive(markets: DBMarket[]): DBMarket[] {
   const now = new Date();
   return markets.filter((m: any) => {
     if (m.status === "resolvido") return false;
-
     const d = getMarketDate(m);
-    if (!d) return true; // sem data → mantém visível
-
+    if (!d) return true;
     const isSport = ["esportes", "basquete", "luta", "volei", "tenis"].includes(m.category);
-    const afterMs = isSport ? 5 * 60 * 60 * 1000 : 0; // 5h de buffer pós-início para esportes
-
+    const afterMs = isSport ? 5 * 60 * 60 * 1000 : 0;
     return now.getTime() <= d.getTime() + afterMs;
   });
 }
@@ -87,11 +85,8 @@ function getMarketInfo(market: DBMarket) {
   const awayLogo = isSport ? ((market as any).away_logo || teams?.teamB?.logo) : null;
   const yesProb  = Math.round((market.yes_price ?? 0.5) * 100);
   const noProb   = 100 - yesProb;
-
-  // ✅ nomes corretos do banco
-  const d = getMarketDate(market as any);
+  const d        = getMarketDate(market as any);
   const dateLabel = d ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : null;
-
   return { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb, dateLabel, isSport };
 }
 
@@ -104,7 +99,6 @@ function fmtVol(v: number | null | undefined) {
 }
 
 // ── AnimatedPriceChart ────────────────────────────────────────────────────────
-
 interface ChartPoint { name: string; home: number; away: number; }
 
 function seedFromId(id: string): number {
@@ -118,15 +112,13 @@ function createOscillator(seed: number, startProb: number) {
   return function next(isBump = false, bumpDir = 1): number {
     t += 1;
     if (isBump) {
-      const bumpSize = 3 + Math.random() * 5;
-      prob += bumpDir * bumpSize;
+      prob += bumpDir * (3 + Math.random() * 5);
     } else {
       const slow    = Math.sin(t * 0.08 + seed) * 1.8;
       const fast    = Math.sin(t * 0.31 + seed * 2.1) * 0.9;
       trend        += (Math.random() - 0.505) * 0.04;
       trend         = Math.max(-0.6, Math.min(0.6, trend));
-      const meanRev = (startProb - prob) * 0.018;
-      prob         += slow * 0.12 + fast * 0.08 + trend + meanRev;
+      prob         += slow * 0.12 + fast * 0.08 + trend + (startProb - prob) * 0.018;
     }
     prob = Math.max(15, Math.min(85, prob));
     return Math.round(prob * 10) / 10;
@@ -147,10 +139,7 @@ function calcDomain(points: ChartPoint[]): [number, number] {
   const min  = Math.min(...vals);
   const max  = Math.max(...vals);
   const pad  = Math.max(6, (max - min) * 0.3);
-  return [
-    Math.max(0,   Math.floor(min - pad)),
-    Math.min(100, Math.ceil(max  + pad)),
-  ];
+  return [Math.max(0, Math.floor(min - pad)), Math.min(100, Math.ceil(max + pad))];
 }
 
 function CustomChartTooltip({ active, payload, labelA, labelB }: any) {
@@ -168,20 +157,16 @@ function CustomChartTooltip({ active, payload, labelA, labelB }: any) {
 
 function BuyNotification({ label, prob, side }: { label: string; prob: number; side: "home" | "away" }) {
   const [visible, setVisible] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(false), 2800);
-    return () => clearTimeout(t);
-  }, []);
+  useEffect(() => { const t = setTimeout(() => setVisible(false), 2800); return () => clearTimeout(t); }, []);
   if (!visible) return null;
   const color = side === "home" ? "#10b981" : "#f87171";
   return (
     <div style={{
       position: "absolute", top: 6, right: 8, zIndex: 10,
-      background: "#111", border: `1px solid ${color}40`,
-      borderRadius: 8, padding: "4px 8px", fontSize: 10,
-      color, display: "flex", alignItems: "center", gap: 4,
-      animation: "fadeInOut 2.8s ease forwards",
-      pointerEvents: "none",
+      background: "#111", border: `1px solid ${color}40`, borderRadius: 8,
+      padding: "4px 8px", fontSize: 10, color,
+      display: "flex", alignItems: "center", gap: 4,
+      animation: "fadeInOut 2.8s ease forwards", pointerEvents: "none",
     }}>
       <span>↑</span>
       <span>Alguém comprou <b>{label}</b> → {prob.toFixed(1)}%</span>
@@ -192,96 +177,88 @@ function BuyNotification({ label, prob, side }: { label: string; prob: number; s
 function AnimatedPriceChart({
   marketId, labelA, labelB, initialProb = 50, onProbChange,
 }: {
-  marketId: string;
-  labelA: string;
-  labelB: string;
+  marketId: string; labelA: string; labelB: string;
   initialProb?: number;
   onProbChange?: (home: number, away: number) => void;
 }) {
-  const [points, setPoints]     = useState<ChartPoint[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [points, setPoints]   = useState<ChartPoint[]>([]);
+  const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<{ label: string; prob: number; side: "home" | "away" } | null>(null);
   const oscRef       = useRef<((isBump?: boolean, bumpDir?: number) => number) | null>(null);
   const tickRef      = useRef<number>(0);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!points.length) return;
-    const last = points[points.length - 1];
-    onProbChange?.(last.home, last.away);
-  }, [points, onProbChange]);
+  const onProbRef    = useRef(onProbChange);
+  useEffect(() => { onProbRef.current = onProbChange; }, [onProbChange]);
 
   useEffect(() => {
     if (!marketId) return;
     setLoading(true);
-    supabase
-      .from("price_history")
-      .select("minute, prob_home, prob_away")
-      .eq("market_id", marketId)
-      .order("minute", { ascending: true })
+    supabase.from("price_history").select("minute, prob_home, prob_away")
+      .eq("market_id", marketId).order("minute", { ascending: true })
       .then(({ data }) => {
         const seed = seedFromId(marketId);
         if (data && data.length >= 3) {
-          const real: ChartPoint[] = data.map((d) => ({
-            name: `${d.minute}m`,
-            home: Number(d.prob_home),
-            away: Number(d.prob_away),
-          }));
+          const real: ChartPoint[] = data.map((d) => ({ name: `${d.minute}m`, home: Number(d.prob_home), away: Number(d.prob_away) }));
           const lastHome = real[real.length - 1]?.home ?? initialProb;
           oscRef.current  = createOscillator(seed, lastHome);
           tickRef.current = data.length;
           setPoints(real.slice(-20));
+          onProbRef.current?.(lastHome, Math.round((100 - lastHome) * 10) / 10);
         } else {
           oscRef.current  = createOscillator(seed, initialProb);
           tickRef.current = 20;
-          setPoints(buildInitialHistory(seed, initialProb));
+          const hist = buildInitialHistory(seed, initialProb);
+          setPoints(hist);
+          const last = hist[hist.length - 1];
+          onProbRef.current?.(last.home, last.away);
         }
         setLoading(false);
       });
     return () => {
-      if (timerRef.current)    clearInterval(timerRef.current);
+      if (timerRef.current)     clearInterval(timerRef.current);
       if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
     };
   }, [marketId, initialProb]);
 
+  const pushPoint = useCallback((home: number, away: number, label: string) => {
+    tickRef.current += 1;
+    setPoints((prev) => [...prev, { name: label, home, away }].slice(-25));
+    onProbRef.current?.(home, away);
+  }, []);
+
   const tick = useCallback(() => {
     if (!oscRef.current) return;
     const home = oscRef.current();
-    const away = Math.round((100 - home) * 10) / 10;
-    tickRef.current += 1;
-    setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home, away }].slice(-25));
-  }, []);
+    pushPoint(home, Math.round((100 - home) * 10) / 10, `${tickRef.current + 1}m`);
+  }, [pushPoint]);
 
   const scheduleBump = useCallback(() => {
     const delay = 8000 + Math.random() * 14000;
     bumpTimerRef.current = setTimeout(() => {
       if (!oscRef.current) { scheduleBump(); return; }
-      const bumpDir  = Math.random() < 0.6 ? 1 : -1;
-      const side     = bumpDir > 0 ? "home" : "away";
-      const newHome  = oscRef.current(true, bumpDir);
-      const newAway  = Math.round((100 - newHome) * 10) / 10;
-      tickRef.current += 1;
-      setPoints((prev) => [...prev, { name: `${tickRef.current}m`, home: newHome, away: newAway }].slice(-25));
+      const bumpDir = Math.random() < 0.6 ? 1 : -1;
+      const side    = bumpDir > 0 ? "home" : "away";
+      const newHome = oscRef.current(true, bumpDir);
+      const newAway = Math.round((100 - newHome) * 10) / 10;
+      pushPoint(newHome, newAway, `${tickRef.current + 1}m`);
       setNotification({ label: side === "home" ? labelA : labelB, prob: side === "home" ? newHome : newAway, side });
       setTimeout(() => setNotification(null), 3200);
       scheduleBump();
     }, delay);
-  }, [labelA, labelB]);
+  }, [labelA, labelB, pushPoint]);
 
   useEffect(() => {
     if (loading) return;
     timerRef.current = setInterval(tick, 3000);
     scheduleBump();
     return () => {
-      if (timerRef.current)    clearInterval(timerRef.current);
+      if (timerRef.current)     clearInterval(timerRef.current);
       if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
     };
   }, [loading, tick, scheduleBump]);
 
-  if (loading) {
-    return <div className="h-[130px] flex items-center justify-center text-xs text-muted-foreground">Carregando gráfico...</div>;
-  }
+  if (loading) return <div className="h-[130px] flex items-center justify-center text-xs text-muted-foreground">Carregando gráfico...</div>;
 
   const [domMin, domMax] = calcDomain(points);
   const lastHome = points[points.length - 1]?.home ?? 50;
@@ -289,19 +266,15 @@ function AnimatedPriceChart({
 
   return (
     <div className="px-2 pt-3 pb-2 relative">
-      {notification && (
-        <BuyNotification label={notification.label} prob={notification.prob} side={notification.side} />
-      )}
+      {notification && <BuyNotification label={notification.label} prob={notification.prob} side={notification.side} />}
       <div className="flex items-center gap-3 justify-start mb-1 px-2">
         <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span className="inline-block w-3 h-0.5 bg-emerald-400 rounded" />
-          {labelA}
-          <span className="font-bold text-emerald-400 ml-0.5">{lastHome.toFixed(1)}%</span>
+          {labelA} <span className="font-bold text-emerald-400 ml-0.5">{lastHome.toFixed(1)}%</span>
         </span>
         <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span className="inline-block w-3 border-t-2 border-dashed border-red-400" />
-          {labelB}
-          <span className="font-bold text-red-400 ml-0.5">{lastAway.toFixed(1)}%</span>
+          {labelB} <span className="font-bold text-red-400 ml-0.5">{lastAway.toFixed(1)}%</span>
         </span>
       </div>
       <ResponsiveContainer width="100%" height={120}>
@@ -314,14 +287,7 @@ function AnimatedPriceChart({
           <Line type="monotoneX" dataKey="away" stroke="#f87171" strokeWidth={2} dot={false} strokeDasharray="5 3" activeDot={{ r: 3, fill: "#f87171" }} isAnimationActive animationDuration={600} animationEasing="ease-out" />
         </LineChart>
       </ResponsiveContainer>
-      <style>{`
-        @keyframes fadeInOut {
-          0%   { opacity: 0; transform: translateY(-4px); }
-          15%  { opacity: 1; transform: translateY(0); }
-          75%  { opacity: 1; }
-          100% { opacity: 0; }
-        }
-      `}</style>
+      <style>{`@keyframes fadeInOut{0%{opacity:0;transform:translateY(-4px)}15%{opacity:1;transform:translateY(0)}75%{opacity:1}100%{opacity:0}}`}</style>
     </div>
   );
 }
@@ -329,23 +295,28 @@ function AnimatedPriceChart({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx]           = useState(0);
+  const [liveProbs, setLiveProbs] = useState({ home: 50, away: 50 });
   const navigate = useNavigate();
-  useEffect(() => setIdx(0), [markets]);
+  useEffect(() => { setIdx(0); setLiveProbs({ home: 50, away: 50 }); }, [markets]);
   if (!markets.length) return null;
 
   const featured = markets[idx];
   const { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb } = getMarketInfo(featured);
-  const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
-  const noOdds  = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
+  const dispHome = liveProbs.home;
+  const dispAway = liveProbs.away;
+  const yesOdds  = dispHome > 0 ? (100 / dispHome).toFixed(2) : "—";
+  const noOdds   = dispAway > 0 ? (100 / dispAway).toFixed(2) : "—";
 
-  // ✅ nomes corretos do banco
+  // ✅ usa getMarketDate que lê event_date / end_date / data_do_evento / data_final
   const eventDt        = getMarketDate(featured as any);
   const now            = new Date();
   const isToday        = eventDt ? eventDt.toDateString() === now.toDateString() : false;
   const isLive         = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
   const eventDateLabel = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : null;
   const eventTimeLabel = eventDt ? eventDt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
+
+  const handleIdx = (n: number) => { setIdx(n); setLiveProbs({ home: 50, away: 50 }); };
 
   return (
     <div className={`rounded-2xl border bg-card overflow-hidden ${isLive ? "border-red-500/50" : "border-border"}`}>
@@ -367,9 +338,9 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIdx((i) => (i - 1 + markets.length) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronLeft className="h-3.5 w-3.5" /></button>
+          <button onClick={() => handleIdx((idx - 1 + markets.length) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronLeft className="h-3.5 w-3.5" /></button>
           <span className="text-xs text-muted-foreground min-w-[50px] text-center">{idx + 1} de {markets.length}</span>
-          <button onClick={() => setIdx((i) => (i + 1) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
+          <button onClick={() => handleIdx((idx + 1) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
         </div>
       </div>
       <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
@@ -384,23 +355,19 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           </div>
           <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              {homeLogo
-                ? <img src={homeLogo} alt={labelA} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelA.slice(0, 2).toUpperCase()}</div>}
+              {homeLogo ? <img src={homeLogo} alt={labelA} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelA.slice(0,2).toUpperCase()}</div>}
               <span className="text-sm font-medium text-foreground truncate">{labelA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{yesProb}%</button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{Math.round(dispHome)}%</button>
           </div>
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              {awayLogo
-                ? <img src={awayLogo} alt={labelB} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelB.slice(0, 2).toUpperCase()}</div>}
+              {awayLogo ? <img src={awayLogo} alt={labelB} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelB.slice(0,2).toUpperCase()}</div>}
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{labelB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{noProb}%</button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{Math.round(dispAway)}%</button>
           </div>
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol(featured.volume || 0)} vol</span>
@@ -408,7 +375,7 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
           </div>
         </div>
         <div className="flex-1 border-l border-border/30 min-w-0">
-          <AnimatedPriceChart marketId={featured.id} labelA={labelA} labelB={labelB} initialProb={yesProb} />
+          <AnimatedPriceChart marketId={featured.id} labelA={labelA} labelB={labelB} initialProb={yesProb} onProbChange={(h, a) => setLiveProbs({ home: h, away: a })} />
         </div>
       </div>
       <div className="border-t border-border/30 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
@@ -427,10 +394,7 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
   );
 }
 
-const SPORT_ICONS: Record<string, string> = {
-  basquete: "🏀", luta: "🥊", volei: "🏐", tenis: "🎾",
-};
-
+const SPORT_ICONS: Record<string, string> = { basquete: "🏀", luta: "🥊", volei: "🏐", tenis: "🎾" };
 const SPORT_COLORS: Record<string, string> = {
   basquete: "text-orange-400 bg-orange-500/10 border-orange-500/20",
   luta:     "text-red-400 bg-red-500/10 border-red-500/20",
@@ -439,43 +403,40 @@ const SPORT_COLORS: Record<string, string> = {
 };
 
 function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx]           = useState(0);
+  const [liveProbs, setLiveProbs] = useState({ home: 50, away: 50 });
   const navigate = useNavigate();
-  useEffect(() => setIdx(0), [markets]);
+  useEffect(() => { setIdx(0); }, [markets]);
   if (!markets.length) return null;
 
-  const featured   = markets[idx];
-  const title      = (featured as any).nome || featured.title || "";
-  const category   = featured.category || "";
-  const icon       = SPORT_ICONS[category] || "🏆";
-  const colorCls   = SPORT_COLORS[category] || "text-violet-400 bg-violet-500/10 border-violet-500/20";
+  const featured = markets[idx];
+  const title    = (featured as any).nome || featured.title || "";
+  const category = featured.category || "";
+  const icon     = SPORT_ICONS[category] || "🏆";
+  const colorCls = SPORT_COLORS[category] || "text-violet-400 bg-violet-500/10 border-violet-500/20";
 
-  // ✅ nomes corretos do banco
-  const eventDt    = getMarketDate(featured as any);
-  const now        = new Date();
-  const isToday    = eventDt ? eventDt.toDateString() === now.toDateString() : false;
-  const isLive     = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
-  const dateLabel  = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
-  const timeLabel  = eventDt ? eventDt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+  // ✅ FIX: usa getMarketDate que lê event_date / end_date corretamente
+  const eventDt = getMarketDate(featured as any);
+  const now     = new Date();
+  const isToday = eventDt ? eventDt.toDateString() === now.toDateString() : false;
+  const isLive  = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
+  // ✅ FIX: se não tiver hora (date-only), mostra "—" no horário em vez de 21:00 errado
+  const hasTime  = eventDt ? eventDt.getUTCHours() !== 0 || eventDt.getUTCMinutes() !== 0 : false;
+  const dateLabel = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+  const timeLabel = hasTime ? eventDt!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
 
-  const parts  = title.split(/ x | vs /i);
-  const teamA  = parts[0]?.trim() || "Time A";
-  const teamB  = parts[1]?.trim() || "Time B";
+  const parts = title.split(/ x | vs /i);
+  const teamA = parts[0]?.trim() || "Time A";
+  const teamB = parts[1]?.trim() || "Time B";
 
-  const yesProb = Math.round(((featured as any).yes_prob ?? 50));
-  const noProb  = 100 - yesProb;
-  const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
-  const noOdds  = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
+  const yesProb  = Math.round(((featured as any).yes_prob ?? 50));
+  const dispHome = liveProbs.home;
+  const dispAway = liveProbs.away;
+  const yesOdds  = dispHome > 0 ? (100 / dispHome).toFixed(2) : "—";
+  const noOdds   = dispAway > 0 ? (100 / dispAway).toFixed(2) : "—";
 
-  const [liveProb, setLiveProb] = useState({ home: yesProb, away: noProb });
-
-  useEffect(() => {
-    setLiveProb({ home: yesProb, away: noProb });
-  }, [featured.id, yesProb, noProb]);
-
-  const handleProbChange = useCallback((home: number, away: number) => {
-    setLiveProb({ home, away });
-  }, []);
+  const handleIdx = (n: number) => { setIdx(n); setLiveProbs({ home: 50, away: 50 }); };
+  const handleProbChange = useCallback((home: number, away: number) => setLiveProbs({ home, away }), []);
 
   return (
     <div className={`rounded-2xl border bg-card overflow-hidden ${isLive ? "border-red-500/50" : "border-violet-500/20"}`}>
@@ -493,12 +454,15 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${colorCls}`}>
             {icon} {category.charAt(0).toUpperCase() + category.slice(1)}
           </span>
-          <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1 rounded-full">📅 {dateLabel} · ⏰ {timeLabel}</span>
+          {/* ✅ só mostra horário se tiver hora real */}
+          <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1 rounded-full">
+            📅 {dateLabel}{timeLabel !== "—" ? ` · ⏰ ${timeLabel}` : ""}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIdx((i) => (i - 1 + markets.length) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronLeft className="h-3.5 w-3.5" /></button>
+          <button onClick={() => handleIdx((idx - 1 + markets.length) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronLeft className="h-3.5 w-3.5" /></button>
           <span className="text-xs text-muted-foreground min-w-[50px] text-center">{idx + 1} de {markets.length}</span>
-          <button onClick={() => setIdx((i) => (i + 1) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
+          <button onClick={() => handleIdx((idx + 1) % markets.length)} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"><ChevronRight className="h-3.5 w-3.5" /></button>
         </div>
       </div>
       <div className="px-5 pt-4 pb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate(`/mercado/${featured.id}`)}>
@@ -519,9 +483,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
-              {liveProb.home.toFixed(1)}%
-            </button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{Math.round(dispHome)}%</button>
           </div>
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
@@ -531,9 +493,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
-              {liveProb.away.toFixed(1)}%
-            </button>
+            <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{Math.round(dispAway)}%</button>
           </div>
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol((featured as any).volume || 0)} vol</span>
@@ -541,31 +501,26 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           </div>
         </div>
         <div className="flex-1 border-l border-border/30 min-w-0 flex flex-col">
-          <AnimatedPriceChart
-            marketId={featured.id}
-            labelA={teamA}
-            labelB={teamB}
-            initialProb={yesProb}
-            onProbChange={handleProbChange}
-          />
+          <AnimatedPriceChart marketId={featured.id} labelA={teamA} labelB={teamB} initialProb={yesProb} onProbChange={handleProbChange} />
           <div className="flex-1 border-t border-border/30 p-4">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Próximos jogos</p>
             <div className="flex flex-col gap-2">
               {markets.slice(0, 3).map((m, i) => {
                 const t   = (m as any).nome || m.title || "";
-                // ✅ nomes corretos do banco
+                // ✅ FIX: usa getMarketDate para ler event_date/end_date corretamente
                 const md  = getMarketDate(m as any);
+                const hasT = md ? md.getUTCHours() !== 0 || md.getUTCMinutes() !== 0 : false;
                 const dl  = md ? md.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
-                const tl  = md ? md.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+                const tl  = hasT ? md!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
                 const ico = SPORT_ICONS[m.category] || "🏆";
                 const isCurrent = i === idx;
                 return (
-                  <div key={m.id} onClick={() => setIdx(i)}
+                  <div key={m.id} onClick={() => handleIdx(i)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all ${isCurrent ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/40 border border-transparent"}`}>
                     <span className="text-base shrink-0">{ico}</span>
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs font-medium truncate ${isCurrent ? "text-primary" : "text-foreground"}`}>{t}</p>
-                      <p className="text-[10px] text-muted-foreground">{dl} · {tl}</p>
+                      <p className="text-[10px] text-muted-foreground">{dl}{tl ? ` · ${tl}` : ""}</p>
                     </div>
                     {isCurrent && <span className="text-[9px] font-bold text-primary shrink-0">● ativo</span>}
                   </div>
@@ -722,15 +677,7 @@ function UFCSidebarCard() {
   const { data: ufcMarket } = useQuery({
     queryKey: ["ufc_next_sidebar"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("markets")
-        .select("id, nome, data_final, yes_prob")
-        .eq("category", "luta")
-        .eq("status", "ativo")
-        // ✅ nome correto do banco
-        .order("data_final", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.from("markets").select("id, nome, end_date, event_date, yes_prob").eq("category", "luta").eq("status", "active").order("end_date", { ascending: true }).limit(1).maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -749,8 +696,7 @@ function UFCSidebarCard() {
   const venue     = espnEvent?.venues?.[0]?.fullName || "";
   const competitions = espnEvent?.competitions || [];
   const mainEvent = competitions[competitions.length - 1];
-  const compA = mainEvent?.competitors?.[0];
-  const compB = mainEvent?.competitors?.[1];
+  const compA = mainEvent?.competitors?.[0]; const compB = mainEvent?.competitors?.[1];
   const idA = compA?.id || ""; const idB = compB?.id || "";
   const nameA = compA?.athlete?.shortName || "—"; const nameB = compB?.athlete?.shortName || "—";
   const photoA = idA ? `https://a.espncdn.com/i/headshots/mma/players/full/${idA}.png` : "";
@@ -784,9 +730,7 @@ function UFCSidebarCard() {
         </div>
       </div>
       <div className="px-4 py-2 flex flex-col gap-2">
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>📅 {dateStr}</span><span>⏰ {timeStr}</span>
-        </div>
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground"><span>📅 {dateStr}</span><span>⏰ {timeStr}</span></div>
         <button onClick={() => ufcMarket && navigate(`/mercado/${ufcMarket.id}`)} className="w-full py-1.5 rounded-lg text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors">Ver mercado →</button>
       </div>
     </div>
@@ -868,12 +812,9 @@ const Index = () => {
   const [activeCatBar, setActiveCatBar]     = useState("Tendência");
   const { data: allMarkets, isLoading } = useMarkets(null);
   const { data: posicoes = [] }         = useMarketPosicoes(selectedMarket?.id ?? "");
-  const activeMarkets   = useMemo(() => { if (!allMarkets) return []; return filterActive(allMarkets); }, [allMarkets]);
-  const sportsMarkets   = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
-  const otherCategories = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
-
-  // Mostra jogos das outras modalidades:
-  // - que já iniciaram (até 5h atrás) OU que vão iniciar nos próximos 3 dias
+  const activeMarkets      = useMemo(() => { if (!allMarkets) return []; return filterActive(allMarkets); }, [allMarkets]);
+  const sportsMarkets      = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
+  const otherCategories    = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
   const otherSportsMarkets = useMemo(() => {
     const now    = new Date();
     const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
@@ -882,17 +823,11 @@ const Index = () => {
       .filter((m) => {
         const d = getMarketDate(m as any);
         if (!d) return false;
-        // Inclui jogos que já começaram (até 5h atrás) E jogos futuros (até 3 dias)
         const inicioJanela = new Date(d.getTime() - 5 * 60 * 60 * 1000);
         return now >= inicioJanela && d <= limite;
       })
-      .sort((a, b) => {
-        const dA = getMarketDate(a as any)?.getTime() ?? 0;
-        const dB = getMarketDate(b as any)?.getTime() ?? 0;
-        return dA - dB;
-      });
+      .sort((a, b) => (getMarketDate(a as any)?.getTime() ?? 0) - (getMarketDate(b as any)?.getTime() ?? 0));
   }, [activeMarkets]);
-
   const displayMarkets = useMemo(() => {
     let base = activeMarkets;
     if (activeCategory !== "todos") base = base.filter((m) => m.category === activeCategory);
