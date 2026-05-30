@@ -64,18 +64,19 @@ async function fetchJogos(comp) {
     const away     = traduzir(j.awayTeam.shortName || j.awayTeam.name);
     const dataJogo = new Date(j.utcDate);
     return {
-      id:             "jogo_fd_" + j.id,
-      nome:           home + " X " + away,
-      end_date:       dataJogo.toISOString(),
-      event_date:     dataJogo.toISOString(),
-      home_logo:      j.homeTeam.crest || null,
-      away_logo:      j.awayTeam.crest || null,
-      image_url:      j.homeTeam.crest || null,
-      away_image_url: j.awayTeam.crest || null,
-      status:         "active",
-      category:       "esportes",
-      volume:         0,
-      yes_prob:       50,
+      eu_ia:            "jogo_fd_" + j.id,
+      nome:             home + " X " + away,
+      // ✅ campos corretos do banco
+      data_final:       dataJogo.toISOString(),
+      data_do_evento:   dataJogo.toISOString(),
+      logotipo_da_casa:  j.homeTeam.crest || null,
+      logotipo_afastado: j.awayTeam.crest || null,
+      image_url:        j.homeTeam.crest || null,
+      status:           "ativo",
+      category:         "esportes",
+      volume:           0,
+      sim_provavelmente: 50,
+      yes_price:        0.5,
     };
   });
 }
@@ -104,37 +105,29 @@ async function fetchNBA() {
     const away     = g.visitor_team.full_name;
     const dataJogo = new Date(g.datetime || g.date);
     return {
-      id:         "nba_" + g.id,
-      nome:       home + " X " + away,
-      end_date:   dataJogo.toISOString(),
-      event_date: g.datetime || g.date + "T00:00:00Z",
-      home_logo:  null,
-      away_logo:  null,
-      status:     "active",
-      category:   "basquete",
-      volume:     0,
-      yes_prob:   50,
+      eu_ia:             "nba_" + g.id,
+      nome:              home + " X " + away,
+      // ✅ campos corretos do banco
+      data_final:        dataJogo.toISOString(),
+      data_do_evento:    g.datetime || g.date + "T00:00:00Z",
+      logotipo_da_casa:  null,
+      logotipo_afastado: null,
+      status:            "ativo",
+      category:          "basquete",
+      volume:            0,
+      sim_provavelmente: 50,
+      yes_price:         0.5,
     };
   });
 }
 
 // ── MMA/UFC ───────────────────────────────────────────────────────────────────
-// ✅ Extrai atletas do short_name do evento (ex: "UFC Fight Night: Medić vs. Rodriguez")
-// O endpoint /fights é pago — usamos só /events que está disponível
 
 function extrairAtletasDoNome(shortName) {
-  // Padrões: "UFC Fight Night: Medić vs. Rodriguez"
-  //          "PFL DC: Jean vs. Musaev"
-  //          "UFC 300: Jones vs. Miocic"
   const match = shortName.match(/:\s*(.+?)\s+vs\.?\s+(.+)$/i);
-  if (match) {
-    return { nomeA: match[1].trim(), nomeB: match[2].trim() };
-  }
-  // Tenta sem prefixo: "Jones vs. Miocic"
+  if (match) return { nomeA: match[1].trim(), nomeB: match[2].trim() };
   const matchSimples = shortName.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
-  if (matchSimples) {
-    return { nomeA: matchSimples[1].trim(), nomeB: matchSimples[2].trim() };
-  }
+  if (matchSimples) return { nomeA: matchSimples[1].trim(), nomeB: matchSimples[2].trim() };
   return { nomeA: null, nomeB: null };
 }
 
@@ -146,11 +139,7 @@ async function fetchMMA() {
   const res = await fetch(url, { headers: { Authorization: BDL_KEY } });
   if (!res.ok) { console.log("Erro " + res.status); return { markets: [], posicoes: [] }; }
   const data = await res.json();
-  const agora  = new Date();
-  const limite = new Date();
-  limite.setDate(limite.getDate() + OUTROS_DAYS);
-
-  // ✅ Amplia para 60 dias para pegar mais eventos (14 dias era muito curto para MMA)
+  const agora    = new Date();
   const limiteMMA = new Date();
   limiteMMA.setDate(limiteMMA.getDate() + 60);
 
@@ -166,56 +155,30 @@ async function fetchMMA() {
   const posicoes = [];
 
   for (const e of eventos) {
-    const dataEvento           = new Date(e.date);
-    const marketId             = "mma_" + e.id;
-    const { nomeA, nomeB }     = extrairAtletasDoNome(e.short_name || e.name);
-
-    // ✅ Se tem atletas no nome, usa "AtletaA vs AtletaB"; senão usa nome do evento
-    const nomeMarket = (nomeA && nomeB)
-      ? nomeA + " vs " + nomeB
-      : e.name;
+    const dataEvento       = new Date(e.date);
+    const marketId         = "mma_" + e.id;
+    const { nomeA, nomeB } = extrairAtletasDoNome(e.short_name || e.name);
+    const nomeMarket       = (nomeA && nomeB) ? nomeA + " vs " + nomeB : e.name;
 
     markets.push({
-      id:         marketId,
-      nome:       nomeMarket,
-      end_date:   dataEvento.toISOString(),
-      event_date: dataEvento.toISOString(),
-      home_logo:  null,
-      away_logo:  null,
-      status:     "active",
-      category:   "luta",
-      volume:     0,
-      yes_prob:   50,
+      eu_ia:             marketId,
+      nome:              nomeMarket,
+      // ✅ campos corretos do banco
+      data_final:        dataEvento.toISOString(),
+      data_do_evento:    dataEvento.toISOString(),
+      logotipo_da_casa:  null,
+      logotipo_afastado: null,
+      status:            "ativo",
+      category:          "luta",
+      volume:            0,
+      sim_provavelmente: 50,
+      yes_price:         0.5,
     });
 
     posicoes.push(
-      {
-        mercado_id:     marketId,
-        tipo:           "time_casa",
-        nome_atleta:    nomeA,   // null se não encontrou no nome
-        preco_unitario: 0.65,
-        volume_total:   1000,
-        volume_dispor:  1000,
-        volume_compra:  0,
-      },
-      {
-        mercado_id:     marketId,
-        tipo:           "empate",
-        nome_atleta:    null,
-        preco_unitario: 0.20,
-        volume_total:   1000,
-        volume_dispor:  1000,
-        volume_compra:  0,
-      },
-      {
-        mercado_id:     marketId,
-        tipo:           "time_fora",
-        nome_atleta:    nomeB,   // null se não encontrou no nome
-        preco_unitario: 0.15,
-        volume_total:   1000,
-        volume_dispor:  1000,
-        volume_compra:  0,
-      }
+      { mercado_id: marketId, tipo: "time_casa", nome_atleta: nomeA,  preco_unitario: 0.65, volume_total: 1000, volume_dispor: 1000, volume_compra: 0 },
+      { mercado_id: marketId, tipo: "empate",    nome_atleta: null,   preco_unitario: 0.20, volume_total: 1000, volume_dispor: 1000, volume_compra: 0 },
+      { mercado_id: marketId, tipo: "time_fora", nome_atleta: nomeB,  preco_unitario: 0.15, volume_total: 1000, volume_dispor: 1000, volume_compra: 0 }
     );
   }
 
@@ -250,16 +213,18 @@ async function fetchTenis() {
     const p2       = m.player2?.full_name || m.away?.name || "Atleta 2";
     const dataJogo = new Date(m.datetime || m.date || start);
     return {
-      id:         "tenis_" + m.id,
-      nome:       p1 + " X " + p2,
-      end_date:   dataJogo.toISOString(),
-      event_date: dataJogo.toISOString(),
-      home_logo:  null,
-      away_logo:  null,
-      status:     "active",
-      category:   "tenis",
-      volume:     0,
-      yes_prob:   50,
+      eu_ia:             "tenis_" + m.id,
+      nome:              p1 + " X " + p2,
+      // ✅ campos corretos do banco
+      data_final:        dataJogo.toISOString(),
+      data_do_evento:    dataJogo.toISOString(),
+      logotipo_da_casa:  null,
+      logotipo_afastado: null,
+      status:            "ativo",
+      category:          "tenis",
+      volume:            0,
+      sim_provavelmente: 50,
+      yes_price:         0.5,
     };
   });
 }
@@ -278,11 +243,15 @@ async function salvar(markets) {
         "apikey":        SUPABASE_KEY,
         "Authorization": "Bearer " + SUPABASE_KEY,
         "Content-Type":  "application/json",
+        // ✅ upsert pela coluna eu_ia para não duplicar
         "Prefer":        "resolution=merge-duplicates",
       },
       body: JSON.stringify(lote),
     });
-    if (!res.ok) { const e = await res.text(); console.error("Erro lote " + i + ": " + e); }
+    if (!res.ok) {
+      const e = await res.text();
+      console.error("Erro lote " + i + ": " + e);
+    }
   }
   console.log("✓ Markets salvos!");
 }
@@ -305,7 +274,10 @@ async function salvarPosicoes(posicoes) {
       },
       body: JSON.stringify(lote),
     });
-    if (!res.ok) { const e = await res.text(); console.error("Erro posicoes: " + e); }
+    if (!res.ok) {
+      const e = await res.text();
+      console.error("Erro posicoes: " + e);
+    }
   }
   console.log("✓ Posicoes salvas!");
 }
@@ -313,31 +285,30 @@ async function salvarPosicoes(posicoes) {
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 
 (async () => {
-  console.log("=== Importador Unificado de Esportes ===");
+  console.log("=== Importador Multi-Esporte ===");
+  console.log("Data: " + new Date().toISOString().split("T")[0]);
   const todos = [];
 
-  console.log("\n[Futebol — football-data.org] próximos " + FOOTBALL_DAYS + " dias");
+  console.log("\n[Futebol — football-data.org]");
   for (const comp of COMPETICOES) {
     todos.push(...await fetchJogos(comp));
     await sleep(1000);
   }
 
-  console.log("\n[Outros Esportes — balldontlie.io] próximos " + OUTROS_DAYS + " dias");
+  console.log("\n[Outros Esportes — balldontlie.io]");
   todos.push(...await fetchNBA());
   await sleep(500);
 
-  // ✅ MMA agora retorna markets + posicoes separados
   const { markets: mmaMarkets, posicoes: mmaPosicoes } = await fetchMMA();
   todos.push(...mmaMarkets);
   await sleep(500);
 
   todos.push(...await fetchTenis());
 
-  const unicos = Object.values(Object.fromEntries(todos.map(j => [j.id, j])));
-  console.log("\nTotal: " + unicos.length + " eventos.");
-  await salvar(unicos);
+  const unicos = Object.values(Object.fromEntries(todos.map(j => [j.eu_ia, j])));
+  console.log("\nTotal: " + unicos.length + " evento(s) encontrado(s).");
 
-  // ✅ Salva atletas nas posicoes depois dos markets
+  await salvar(unicos);
   await salvarPosicoes(mmaPosicoes);
 
   console.log("\nFeito!");
