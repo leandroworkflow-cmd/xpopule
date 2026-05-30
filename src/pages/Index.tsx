@@ -50,13 +50,18 @@ function useOpcoesMercado(marketId: string, enabled: boolean) {
   });
 }
 
+// ── CORREÇÃO 1: buffer de 4h para TODOS os esportes ──────────────────────────
+// Antes: buffer de 2h só para "esportes" → basquete/luta/volei/tenis sumiam na hora
+// Agora: todos os esportes ficam visíveis até 4h após o horário marcado
 function filterActive(markets: DBMarket[]): DBMarket[] {
   const now = new Date();
   return markets.filter((m) => {
     const end = new Date((m as any).end_date || (m as any).event_date || "");
     if (isNaN(end.getTime())) return true;
-    const isSport = ["esportes", "basquete", "luta", "volei", "tenis"].includes((m as any).category);
-    const bufferMs = isSport ? 2 * 60 * 60 * 1000 : 0;
+    const isSport = ["esportes", "basquete", "luta", "volei", "tenis"].includes(
+      (m as any).category
+    );
+    const bufferMs = isSport ? 4 * 60 * 60 * 1000 : 0;
     return end.getTime() + bufferMs >= now.getTime();
   });
 }
@@ -86,8 +91,6 @@ function fmtVol(v: number | null | undefined) {
   if (n > 0)          return `$${n.toLocaleString("pt-BR")}`;
   return "—";
 }
-
-// ── AnimatedPriceChart ────────────────────────────────────────────────────────
 
 interface ChartPoint { name: string; home: number; away: number; }
 
@@ -180,7 +183,7 @@ function AnimatedPriceChart({
   labelA: string;
   labelB: string;
   initialProb?: number;
-  onProbChange?: (home: number, away: number) => void; // ← novo callback
+  onProbChange?: (home: number, away: number) => void;
 }) {
   const [points, setPoints]     = useState<ChartPoint[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -190,7 +193,6 @@ function AnimatedPriceChart({
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Notifica o pai sempre que os pontos mudam ──────────────────────────────
   useEffect(() => {
     if (!points.length) return;
     const last = points[points.length - 1];
@@ -277,7 +279,6 @@ function AnimatedPriceChart({
       {notification && (
         <BuyNotification label={notification.label} prob={notification.prob} side={notification.side} />
       )}
-
       <div className="flex items-center gap-3 justify-start mb-1 px-2">
         <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span className="inline-block w-3 h-0.5 bg-emerald-400 rounded" />
@@ -290,62 +291,16 @@ function AnimatedPriceChart({
           <span className="font-bold text-red-400 ml-0.5">{lastAway.toFixed(1)}%</span>
         </span>
       </div>
-
       <ResponsiveContainer width="100%" height={120}>
         <LineChart data={points} margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
-          <XAxis
-            dataKey="name"
-            tick={{ fontSize: 8, fill: "#444" }}
-            tickLine={false}
-            axisLine={false}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            orientation="right"
-            domain={[domMin, domMax]}
-            tick={{ fontSize: 9, fill: "#555" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => `${v}%`}
-            tickCount={5}
-            width={38}
-          />
-          <ReferenceLine
-            y={Math.round((domMin + domMax) / 2)}
-            stroke="#2a2a2a"
-            strokeDasharray="3 3"
-            strokeWidth={1}
-          />
-          <Tooltip
-            content={<CustomChartTooltip labelA={labelA} labelB={labelB} />}
-            cursor={{ stroke: "#333", strokeWidth: 1 }}
-          />
-          <Line
-            type="monotoneX"
-            dataKey="home"
-            stroke="#10b981"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 3, fill: "#10b981" }}
-            isAnimationActive
-            animationDuration={600}
-            animationEasing="ease-out"
-          />
-          <Line
-            type="monotoneX"
-            dataKey="away"
-            stroke="#f87171"
-            strokeWidth={2}
-            dot={false}
-            strokeDasharray="5 3"
-            activeDot={{ r: 3, fill: "#f87171" }}
-            isAnimationActive
-            animationDuration={600}
-            animationEasing="ease-out"
-          />
+          <XAxis dataKey="name" tick={{ fontSize: 8, fill: "#444" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+          <YAxis orientation="right" domain={[domMin, domMax]} tick={{ fontSize: 9, fill: "#555" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} tickCount={5} width={38} />
+          <ReferenceLine y={Math.round((domMin + domMax) / 2)} stroke="#2a2a2a" strokeDasharray="3 3" strokeWidth={1} />
+          <Tooltip content={<CustomChartTooltip labelA={labelA} labelB={labelB} />} cursor={{ stroke: "#333", strokeWidth: 1 }} />
+          <Line type="monotoneX" dataKey="home" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3, fill: "#10b981" }} isAnimationActive animationDuration={600} animationEasing="ease-out" />
+          <Line type="monotoneX" dataKey="away" stroke="#f87171" strokeWidth={2} dot={false} strokeDasharray="5 3" activeDot={{ r: 3, fill: "#f87171" }} isAnimationActive animationDuration={600} animationEasing="ease-out" />
         </LineChart>
       </ResponsiveContainer>
-
       <style>{`
         @keyframes fadeInOut {
           0%   { opacity: 0; transform: translateY(-4px); }
@@ -357,8 +312,6 @@ function AnimatedPriceChart({
     </div>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
   const [idx, setIdx] = useState(0);
@@ -375,7 +328,7 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
   const now            = new Date();
   const eventDt        = eventDate ? new Date(eventDate) : null;
   const isToday        = eventDt ? eventDt.toDateString() === now.toDateString() : false;
-  const isLive         = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 2 * 60 * 60 * 1000)) : false;
+  const isLive         = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 4 * 60 * 60 * 1000)) : false;
   const eventDateLabel = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : null;
   const eventTimeLabel = eventDt ? eventDt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
 
@@ -485,7 +438,7 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const endDateObj = new Date(eventDate);
   const now        = new Date();
   const isToday    = endDateObj.toDateString() === now.toDateString();
-  const isLive     = !isNaN(endDateObj.getTime()) && endDateObj <= now && now <= new Date(endDateObj.getTime() + 3 * 60 * 60 * 1000);
+  const isLive     = !isNaN(endDateObj.getTime()) && endDateObj <= now && now <= new Date(endDateObj.getTime() + 4 * 60 * 60 * 1000);
   const dateLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
   const timeLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -498,19 +451,15 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
   const noOdds  = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
 
-  // ── Estado live das probabilidades sincronizado com o gráfico ──────────────
   const [liveProb, setLiveProb] = useState({ home: yesProb, away: noProb });
 
-  // Reseta quando o card muda (usuário clica nas setas)
   useEffect(() => {
     setLiveProb({ home: yesProb, away: noProb });
   }, [featured.id, yesProb, noProb]);
 
-  // Callback estável para receber updates do gráfico
   const handleProbChange = useCallback((home: number, away: number) => {
     setLiveProb({ home, away });
   }, []);
-  // ──────────────────────────────────────────────────────────────────────────
 
   return (
     <div className={`rounded-2xl border bg-card overflow-hidden ${isLive ? "border-red-500/50" : "border-violet-500/20"}`}>
@@ -554,7 +503,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
-            {/* ← Agora usa liveProb.home em vez de yesProb estático */}
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">
               {liveProb.home.toFixed(1)}%
             </button>
@@ -567,7 +515,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
-            {/* ← Agora usa liveProb.away em vez de noProb estático */}
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
               {liveProb.away.toFixed(1)}%
             </button>
@@ -578,7 +525,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           </div>
         </div>
         <div className="flex-1 border-l border-border/30 min-w-0 flex flex-col">
-          {/* ← Passa o callback onProbChange para o gráfico */}
           <AnimatedPriceChart
             marketId={featured.id}
             labelA={teamA}
@@ -900,10 +846,29 @@ const Index = () => {
   const activeMarkets   = useMemo(() => { if (!allMarkets) return []; return filterActive(allMarkets); }, [allMarkets]);
   const sportsMarkets   = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
   const otherCategories = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
+
+  // ── CORREÇÃO 2: mostra jogos em andamento (não só futuros) ────────────────
+  // Antes: só mostrava jogos com d >= now → sumia exatamente na hora marcada
+  // Agora: janela de 30min antes até 4h depois → fica visível durante o jogo
   const otherSportsMarkets = useMemo(() => {
-    const now = new Date(); const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-    return activeMarkets.filter((m) => ["basquete", "luta", "volei", "tenis"].includes(m.category)).filter((m) => { const d = new Date((m as any).end_date || (m as any).event_date || ""); return !isNaN(d.getTime()) && d >= now && d <= limite; }).sort((a, b) => new Date((a as any).end_date || "").getTime() - new Date((b as any).end_date || "").getTime());
+    const now      = new Date();
+    const limite   = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const bufferMs = 4 * 60 * 60 * 1000;
+    return activeMarkets
+      .filter((m) => ["basquete", "luta", "volei", "tenis"].includes(m.category))
+      .filter((m) => {
+        const d = new Date((m as any).end_date || (m as any).event_date || "");
+        if (isNaN(d.getTime())) return false;
+        const inicioJanela = d.getTime() - 30 * 60 * 1000; // 30min antes
+        const fimJanela    = d.getTime() + bufferMs;         // 4h depois
+        return now.getTime() >= inicioJanela && now.getTime() <= fimJanela && d <= limite;
+      })
+      .sort((a, b) =>
+        new Date((a as any).end_date || "").getTime() -
+        new Date((b as any).end_date || "").getTime()
+      );
   }, [activeMarkets]);
+
   const displayMarkets = useMemo(() => {
     let base = activeMarkets;
     if (activeCategory !== "todos") base = base.filter((m) => m.category === activeCategory);
