@@ -50,19 +50,29 @@ function useOpcoesMercado(marketId: string, enabled: boolean) {
   });
 }
 
-// ── CORREÇÃO 1: buffer de 4h para TODOS os esportes ──────────────────────────
-// Antes: buffer de 2h só para "esportes" → basquete/luta/volei/tenis sumiam na hora
-// Agora: todos os esportes ficam visíveis até 4h após o horário marcado
+// Retorna a data do mercado usando os nomes corretos do banco
+function getMarketDate(m: any): Date | null {
+  const str = m.data_final || m.data_do_evento || "";
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Mercado fica visível:
+// - status "resolvido" → sempre oculto
+// - sem data → sempre visível
+// - com data → visível desde 30min antes até 5h depois do horário marcado
 function filterActive(markets: DBMarket[]): DBMarket[] {
   const now = new Date();
-  return markets.filter((m) => {
-    const end = new Date((m as any).end_date || (m as any).event_date || "");
-    if (isNaN(end.getTime())) return true;
-    const isSport = ["esportes", "basquete", "luta", "volei", "tenis"].includes(
-      (m as any).category
-    );
-    const bufferMs = isSport ? 4 * 60 * 60 * 1000 : 0;
-    return end.getTime() + bufferMs >= now.getTime();
+  return markets.filter((m: any) => {
+    if (m.status === "resolvido") return false;
+
+    const d = getMarketDate(m);
+    if (!d) return true; // sem data → mantém visível
+
+    const isSport = ["esportes", "basquete", "luta", "volei", "tenis"].includes(m.category);
+    const afterMs = isSport ? 5 * 60 * 60 * 1000 : 0; // 5h de buffer pós-início para esportes
+
+    return now.getTime() <= d.getTime() + afterMs;
   });
 }
 
@@ -77,10 +87,11 @@ function getMarketInfo(market: DBMarket) {
   const awayLogo = isSport ? ((market as any).away_logo || teams?.teamB?.logo) : null;
   const yesProb  = Math.round((market.yes_price ?? 0.5) * 100);
   const noProb   = 100 - yesProb;
-  const endDate  = (market as any).end_date;
-  const dateLabel = endDate
-    ? new Date(endDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
-    : null;
+
+  // ✅ nomes corretos do banco
+  const d = getMarketDate(market as any);
+  const dateLabel = d ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : null;
+
   return { title, labelA, labelB, homeLogo, awayLogo, yesProb, noProb, dateLabel, isSport };
 }
 
@@ -91,6 +102,8 @@ function fmtVol(v: number | null | undefined) {
   if (n > 0)          return `$${n.toLocaleString("pt-BR")}`;
   return "—";
 }
+
+// ── AnimatedPriceChart ────────────────────────────────────────────────────────
 
 interface ChartPoint { name: string; home: number; away: number; }
 
@@ -313,6 +326,8 @@ function AnimatedPriceChart({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
   const [idx, setIdx] = useState(0);
   const navigate = useNavigate();
@@ -324,11 +339,11 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
   const yesOdds = yesProb > 0 ? (100 / yesProb).toFixed(2) : "—";
   const noOdds  = noProb  > 0 ? (100 / noProb).toFixed(2)  : "—";
 
-  const eventDate      = (featured as any).event_date;
+  // ✅ nomes corretos do banco
+  const eventDt        = getMarketDate(featured as any);
   const now            = new Date();
-  const eventDt        = eventDate ? new Date(eventDate) : null;
   const isToday        = eventDt ? eventDt.toDateString() === now.toDateString() : false;
-  const isLive         = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 4 * 60 * 60 * 1000)) : false;
+  const isLive         = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
   const eventDateLabel = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : null;
   const eventTimeLabel = eventDt ? eventDt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
 
@@ -434,13 +449,14 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const category   = featured.category || "";
   const icon       = SPORT_ICONS[category] || "🏆";
   const colorCls   = SPORT_COLORS[category] || "text-violet-400 bg-violet-500/10 border-violet-500/20";
-  const eventDate  = (featured as any).event_date || (featured as any).end_date || "";
-  const endDateObj = new Date(eventDate);
+
+  // ✅ nomes corretos do banco
+  const eventDt    = getMarketDate(featured as any);
   const now        = new Date();
-  const isToday    = endDateObj.toDateString() === now.toDateString();
-  const isLive     = !isNaN(endDateObj.getTime()) && endDateObj <= now && now <= new Date(endDateObj.getTime() + 4 * 60 * 60 * 1000);
-  const dateLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
-  const timeLabel  = !isNaN(endDateObj.getTime()) ? endDateObj.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+  const isToday    = eventDt ? eventDt.toDateString() === now.toDateString() : false;
+  const isLive     = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
+  const dateLabel  = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+  const timeLabel  = eventDt ? eventDt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
 
   const parts  = title.split(/ x | vs /i);
   const teamA  = parts[0]?.trim() || "Time A";
@@ -536,10 +552,11 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Próximos jogos</p>
             <div className="flex flex-col gap-2">
               {markets.slice(0, 3).map((m, i) => {
-                const t  = (m as any).nome || m.title || "";
-                const d  = new Date((m as any).end_date || "");
-                const dl = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-                const tl = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                const t   = (m as any).nome || m.title || "";
+                // ✅ nomes corretos do banco
+                const md  = getMarketDate(m as any);
+                const dl  = md ? md.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
+                const tl  = md ? md.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
                 const ico = SPORT_ICONS[m.category] || "🏆";
                 const isCurrent = i === idx;
                 return (
@@ -705,7 +722,15 @@ function UFCSidebarCard() {
   const { data: ufcMarket } = useQuery({
     queryKey: ["ufc_next_sidebar"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("markets").select("id, nome, end_date, yes_prob").eq("category", "luta").eq("status", "active").order("end_date", { ascending: true }).limit(1).maybeSingle();
+      const { data, error } = await supabase
+        .from("markets")
+        .select("id, nome, data_final, yes_prob")
+        .eq("category", "luta")
+        .eq("status", "ativo")
+        // ✅ nome correto do banco
+        .order("data_final", { ascending: true })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -847,26 +872,25 @@ const Index = () => {
   const sportsMarkets   = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
   const otherCategories = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
 
-  // ── CORREÇÃO 2: mostra jogos em andamento (não só futuros) ────────────────
-  // Antes: só mostrava jogos com d >= now → sumia exatamente na hora marcada
-  // Agora: janela de 30min antes até 4h depois → fica visível durante o jogo
+  // Mostra jogos das outras modalidades:
+  // - que já iniciaram (até 5h atrás) OU que vão iniciar nos próximos 3 dias
   const otherSportsMarkets = useMemo(() => {
-    const now      = new Date();
-    const limite   = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-    const bufferMs = 4 * 60 * 60 * 1000;
+    const now    = new Date();
+    const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
     return activeMarkets
       .filter((m) => ["basquete", "luta", "volei", "tenis"].includes(m.category))
       .filter((m) => {
-        const d = new Date((m as any).end_date || (m as any).event_date || "");
-        if (isNaN(d.getTime())) return false;
-        const inicioJanela = d.getTime() - 30 * 60 * 1000; // 30min antes
-        const fimJanela    = d.getTime() + bufferMs;         // 4h depois
-        return now.getTime() >= inicioJanela && now.getTime() <= fimJanela && d <= limite;
+        const d = getMarketDate(m as any);
+        if (!d) return false;
+        // Inclui jogos que já começaram (até 5h atrás) E jogos futuros (até 3 dias)
+        const inicioJanela = new Date(d.getTime() - 5 * 60 * 60 * 1000);
+        return now >= inicioJanela && d <= limite;
       })
-      .sort((a, b) =>
-        new Date((a as any).end_date || "").getTime() -
-        new Date((b as any).end_date || "").getTime()
-      );
+      .sort((a, b) => {
+        const dA = getMarketDate(a as any)?.getTime() ?? 0;
+        const dB = getMarketDate(b as any)?.getTime() ?? 0;
+        return dA - dB;
+      });
   }, [activeMarkets]);
 
   const displayMarkets = useMemo(() => {
