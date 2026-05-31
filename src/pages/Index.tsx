@@ -47,16 +47,8 @@ function useOpcoesMercado(marketId: string, enabled: boolean) {
   });
 }
 
-// ✅ FIX PRINCIPAL: lê TODOS os campos de data possíveis do banco
-// O script salva como event_date / end_date
-// Versões antigas usam data_do_evento / data_final
 function getMarketDate(m: any): Date | null {
-  const str =
-    m.event_date    ||   // ✅ campo salvo pelo fetch-jogos (NBA, MMA, Tênis, Futebol)
-    m.end_date      ||   // ✅ campo salvo pelo fetch-jogos como fallback
-    m.data_do_evento ||  // campo de versões antigas
-    m.data_final    ||   // campo de versões antigas
-    "";
+  const str = m.event_date || m.end_date || m.data_do_evento || m.data_final || "";
   if (!str) return null;
   const d = new Date(str);
   return isNaN(d.getTime()) ? null : d;
@@ -98,6 +90,145 @@ function fmtVol(v: number | null | undefined) {
   return "—";
 }
 
+// ── Hook: placar ao vivo ESPN ─────────────────────────────────────────────────
+// Busca placar real da ESPN para futebol (Brasileirão) e basquete (NBA)
+// quando o jogo está AO VIVO. Tenta casar pelo nome dos times.
+
+interface LiveScore { homeScore: number; awayScore: number; period: string; clock: string; }
+
+function normalizeTeam(name: string): string {
+  return name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function teamsMatch(a: string, b: string): boolean {
+  const na = normalizeTeam(a);
+  const nb = normalizeTeam(b);
+  return na.includes(nb) || nb.includes(na) || na.slice(0, 4) === nb.slice(0, 4);
+}
+
+function useEspnLiveScore(teamA: string, teamB: string, category: string, isLive: boolean): LiveScore | null {
+  const isSoccer   = category === "esportes";
+  const isBasketball = category === "basquete";
+  const enabled    = isLive && (isSoccer || isBasketball);
+
+  // URLs ESPN para scoreboard ao vivo
+  const soccerLeagues = ["bra.1", "bra.2", "conmebol.libertadores", "uefa.champions"];
+  const { data: soccerData } = useQuery({
+    queryKey: ["espn_soccer_live"],
+    queryFn: async () => {
+      const results = await Promise.all(
+        soccerLeagues.map((league) =>
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard`)
+            .then((r) => r.json()).catch(() => null)
+        )
+      );
+      return results.filter(Boolean);
+    },
+    enabled: enabled && isSoccer,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  });
+
+  const { data: nbaData } = useQuery({
+    queryKey: ["espn_nba_live"],
+    queryFn: async () =>
+      fetch("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard")
+        .then((r) => r.json()),
+    enabled: enabled && isBasketball,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  });
+
+  if (!enabled) return null;
+
+  // Futebol: vasculha todas as ligas
+  if (isSoccer && soccerData) {
+    for (const league of soccerData) {
+      for (const event of (league?.events || [])) {
+        const comp = event?.competitions?.[0];
+        if (!comp) continue;
+        const home = comp.competitors?.find((c: any) => c.homeAway === "home");
+        const away = comp.competitors?.find((c: any) => c.homeAway === "away");
+        if (!home || !away) continue;
+        const homeName = home.team?.displayName || home.team?.name || "";
+        const awayName = away.team?.displayName || away.team?.name || "";
+        if (teamsMatch(teamA, homeName) && teamsMatch(teamB, awayName)) {
+          const status = comp.status?.type;
+          if (status?.state === "in") {
+            return {
+              homeScore: parseInt(home.score || "0"),
+              awayScore: parseInt(away.score || "0"),
+              period:    status?.shortDetail || "",
+              clock:     comp.status?.displayClock || "",
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // NBA
+  if (isBasketball && nbaData) {
+    for (const event of (nbaData?.events || [])) {
+      const comp = event?.competitions?.[0];
+      if (!comp) continue;
+      const home = comp.competitors?.find((c: any) => c.homeAway === "home");
+      const away = comp.competitors?.find((c: any) => c.homeAway === "away");
+      if (!home || !away) continue;
+      const homeName = home.team?.displayName || home.team?.name || "";
+      const awayName = away.team?.displayName || away.team?.name || "";
+      if (teamsMatch(teamA, homeName) && teamsMatch(teamB, awayName)) {
+        const status = comp.status?.type;
+        if (status?.state === "in") {
+          return {
+            homeScore: parseInt(home.score || "0"),
+            awayScore: parseInt(away.score || "0"),
+            period:    status?.shortDetail || "",
+            clock:     comp.status?.displayClock || "",
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// ── Placar ao vivo: componente visual ─────────────────────────────────────────
+function LiveScoreBadge({ score, period, clock }: { score: LiveScore; period: string; clock: string }) {
+  const [flash, setFlash] = useState(false);
+  const prevScore = useRef({ h: score.homeScore, a: score.awayScore });
+
+  useEffect(() => {
+    if (score.homeScore !== prevScore.current.h || score.awayScore !== prevScore.current.a) {
+      setFlash(true);
+      setTimeout(() => setFlash(false), 1200);
+      prevScore.current = { h: score.homeScore, a: score.awayScore };
+    }
+  }, [score.homeScore, score.awayScore]);
+
+  return (
+    <div className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl border transition-all duration-300 ${flash ? "bg-red-500/20 border-red-500/60 scale-110" : "bg-card border-border/60"}`}>
+      <div className={`text-2xl font-black tracking-wider tabular-nums transition-colors ${flash ? "text-red-400" : "text-foreground"}`}>
+        {score.homeScore} <span className="text-muted-foreground text-lg">×</span> {score.awayScore}
+      </div>
+      {(period || clock) && (
+        <div className="flex items-center gap-1 mt-0.5">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+          </span>
+          <span className="text-[9px] font-bold text-red-400 uppercase tracking-wide">
+            {period}{clock ? ` · ${clock}` : ""}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── AnimatedPriceChart ────────────────────────────────────────────────────────
 interface ChartPoint { name: string; home: number; away: number; }
 
@@ -106,19 +237,17 @@ function seedFromId(id: string): number {
 }
 
 function createOscillator(seed: number, startProb: number) {
-  let t     = seed % 1000;
-  let prob  = startProb;
-  let trend = Math.sin(seed) * 0.3;
+  let t = seed % 1000, prob = startProb, trend = Math.sin(seed) * 0.3;
   return function next(isBump = false, bumpDir = 1): number {
     t += 1;
     if (isBump) {
       prob += bumpDir * (3 + Math.random() * 5);
     } else {
-      const slow    = Math.sin(t * 0.08 + seed) * 1.8;
-      const fast    = Math.sin(t * 0.31 + seed * 2.1) * 0.9;
-      trend        += (Math.random() - 0.505) * 0.04;
-      trend         = Math.max(-0.6, Math.min(0.6, trend));
-      prob         += slow * 0.12 + fast * 0.08 + trend + (startProb - prob) * 0.018;
+      const slow = Math.sin(t * 0.08 + seed) * 1.8;
+      const fast = Math.sin(t * 0.31 + seed * 2.1) * 0.9;
+      trend += (Math.random() - 0.505) * 0.04;
+      trend  = Math.max(-0.6, Math.min(0.6, trend));
+      prob  += slow * 0.12 + fast * 0.08 + trend + (startProb - prob) * 0.018;
     }
     prob = Math.max(15, Math.min(85, prob));
     return Math.round(prob * 10) / 10;
@@ -136,9 +265,8 @@ function buildInitialHistory(seed: number, startProb: number): ChartPoint[] {
 function calcDomain(points: ChartPoint[]): [number, number] {
   if (!points.length) return [20, 80];
   const vals = points.flatMap((p) => [p.home, p.away]);
-  const min  = Math.min(...vals);
-  const max  = Math.max(...vals);
-  const pad  = Math.max(6, (max - min) * 0.3);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const pad = Math.max(6, (max - min) * 0.3);
   return [Math.max(0, Math.floor(min - pad)), Math.min(100, Math.ceil(max + pad))];
 }
 
@@ -184,11 +312,11 @@ function AnimatedPriceChart({
   const [points, setPoints]   = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<{ label: string; prob: number; side: "home" | "away" } | null>(null);
-  const oscRef       = useRef<((isBump?: boolean, bumpDir?: number) => number) | null>(null);
-  const tickRef      = useRef<number>(0);
-  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const oscRef = useRef<((isBump?: boolean, bumpDir?: number) => number) | null>(null);
+  const tickRef = useRef<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onProbRef    = useRef(onProbChange);
+  const onProbRef = useRef(onProbChange);
   useEffect(() => { onProbRef.current = onProbChange; }, [onProbChange]);
 
   useEffect(() => {
@@ -201,12 +329,12 @@ function AnimatedPriceChart({
         if (data && data.length >= 3) {
           const real: ChartPoint[] = data.map((d) => ({ name: `${d.minute}m`, home: Number(d.prob_home), away: Number(d.prob_away) }));
           const lastHome = real[real.length - 1]?.home ?? initialProb;
-          oscRef.current  = createOscillator(seed, lastHome);
+          oscRef.current = createOscillator(seed, lastHome);
           tickRef.current = data.length;
           setPoints(real.slice(-20));
           onProbRef.current?.(lastHome, Math.round((100 - lastHome) * 10) / 10);
         } else {
-          oscRef.current  = createOscillator(seed, initialProb);
+          oscRef.current = createOscillator(seed, initialProb);
           tickRef.current = 20;
           const hist = buildInitialHistory(seed, initialProb);
           setPoints(hist);
@@ -216,7 +344,7 @@ function AnimatedPriceChart({
         setLoading(false);
       });
     return () => {
-      if (timerRef.current)     clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
     };
   }, [marketId, initialProb]);
@@ -238,7 +366,7 @@ function AnimatedPriceChart({
     bumpTimerRef.current = setTimeout(() => {
       if (!oscRef.current) { scheduleBump(); return; }
       const bumpDir = Math.random() < 0.6 ? 1 : -1;
-      const side    = bumpDir > 0 ? "home" : "away";
+      const side = bumpDir > 0 ? "home" : "away";
       const newHome = oscRef.current(true, bumpDir);
       const newAway = Math.round((100 - newHome) * 10) / 10;
       pushPoint(newHome, newAway, `${tickRef.current + 1}m`);
@@ -253,7 +381,7 @@ function AnimatedPriceChart({
     timerRef.current = setInterval(tick, 3000);
     scheduleBump();
     return () => {
-      if (timerRef.current)     clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
     };
   }, [loading, tick, scheduleBump]);
@@ -295,7 +423,7 @@ function AnimatedPriceChart({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
-  const [idx, setIdx]           = useState(0);
+  const [idx, setIdx] = useState(0);
   const [liveProbs, setLiveProbs] = useState({ home: 50, away: 50 });
   const navigate = useNavigate();
   useEffect(() => { setIdx(0); setLiveProbs({ home: 50, away: 50 }); }, [markets]);
@@ -308,13 +436,15 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
   const yesOdds  = dispHome > 0 ? (100 / dispHome).toFixed(2) : "—";
   const noOdds   = dispAway > 0 ? (100 / dispAway).toFixed(2) : "—";
 
-  // ✅ usa getMarketDate que lê event_date / end_date / data_do_evento / data_final
   const eventDt        = getMarketDate(featured as any);
   const now            = new Date();
   const isToday        = eventDt ? eventDt.toDateString() === now.toDateString() : false;
   const isLive         = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
   const eventDateLabel = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : null;
   const eventTimeLabel = eventDt ? eventDt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null;
+
+  // ✅ Placar ao vivo ESPN
+  const liveScore = useEspnLiveScore(labelA, labelB, featured.category || "", isLive);
 
   const handleIdx = (n: number) => { setIdx(n); setLiveProbs({ home: 50, away: 50 }); };
 
@@ -353,22 +483,53 @@ function FeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m
             <span className="w-14 text-center mr-3">Paga fora</span>
             <span className="w-16 text-center">Probabilidades</span>
           </div>
+
+          {/* ✅ Time A com placar sobreposto */}
           <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              {homeLogo ? <img src={homeLogo} alt={labelA} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelA.slice(0,2).toUpperCase()}</div>}
+              <div className="relative shrink-0">
+                {homeLogo
+                  ? <img src={homeLogo} alt={labelA} className="h-8 w-8 rounded-full object-contain bg-muted" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">{labelA.slice(0,2).toUpperCase()}</div>}
+                {/* Badge de placar sobre o escudo */}
+                {liveScore && (
+                  <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[8px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-md">
+                    {liveScore.homeScore}
+                  </span>
+                )}
+              </div>
               <span className="text-sm font-medium text-foreground truncate">{labelA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{Math.round(dispHome)}%</button>
           </div>
+
+          {/* Placar central quando ao vivo */}
+          {liveScore && (
+            <div className="flex justify-center my-1">
+              <LiveScoreBadge score={liveScore} period={liveScore.period} clock={liveScore.clock} />
+            </div>
+          )}
+
+          {/* ✅ Time B com placar sobreposto */}
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              {awayLogo ? <img src={awayLogo} alt={labelB} className="h-8 w-8 rounded-full object-contain bg-muted shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /> : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{labelB.slice(0,2).toUpperCase()}</div>}
+              <div className="relative shrink-0">
+                {awayLogo
+                  ? <img src={awayLogo} alt={labelB} className="h-8 w-8 rounded-full object-contain bg-muted" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  : <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">{labelB.slice(0,2).toUpperCase()}</div>}
+                {liveScore && (
+                  <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[8px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-md">
+                    {liveScore.awayScore}
+                  </span>
+                )}
+              </div>
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{labelB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{Math.round(dispAway)}%</button>
           </div>
+
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol(featured.volume || 0)} vol</span>
             <span>Espalhe e Total</span>
@@ -403,7 +564,7 @@ const SPORT_COLORS: Record<string, string> = {
 };
 
 function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; onSelect: (m: DBMarket) => void }) {
-  const [idx, setIdx]           = useState(0);
+  const [idx, setIdx] = useState(0);
   const [liveProbs, setLiveProbs] = useState({ home: 50, away: 50 });
   const navigate = useNavigate();
   useEffect(() => { setIdx(0); }, [markets]);
@@ -415,12 +576,10 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const icon     = SPORT_ICONS[category] || "🏆";
   const colorCls = SPORT_COLORS[category] || "text-violet-400 bg-violet-500/10 border-violet-500/20";
 
-  // ✅ FIX: usa getMarketDate que lê event_date / end_date corretamente
-  const eventDt = getMarketDate(featured as any);
-  const now     = new Date();
-  const isToday = eventDt ? eventDt.toDateString() === now.toDateString() : false;
-  const isLive  = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
-  // ✅ FIX: se não tiver hora (date-only), mostra "—" no horário em vez de 21:00 errado
+  const eventDt  = getMarketDate(featured as any);
+  const now      = new Date();
+  const isToday  = eventDt ? eventDt.toDateString() === now.toDateString() : false;
+  const isLive   = eventDt ? (eventDt <= now && now <= new Date(eventDt.getTime() + 5 * 60 * 60 * 1000)) : false;
   const hasTime  = eventDt ? eventDt.getUTCHours() !== 0 || eventDt.getUTCMinutes() !== 0 : false;
   const dateLabel = eventDt ? eventDt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
   const timeLabel = hasTime ? eventDt!.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
@@ -434,6 +593,9 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
   const dispAway = liveProbs.away;
   const yesOdds  = dispHome > 0 ? (100 / dispHome).toFixed(2) : "—";
   const noOdds   = dispAway > 0 ? (100 / dispAway).toFixed(2) : "—";
+
+  // ✅ Placar ao vivo ESPN para basquete
+  const liveScore = useEspnLiveScore(teamA, teamB, category, isLive);
 
   const handleIdx = (n: number) => { setIdx(n); setLiveProbs({ home: 50, away: 50 }); };
   const handleProbChange = useCallback((home: number, away: number) => setLiveProbs({ home, away }), []);
@@ -454,7 +616,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${colorCls}`}>
             {icon} {category.charAt(0).toUpperCase() + category.slice(1)}
           </span>
-          {/* ✅ só mostra horário se tiver hora real */}
           <span className="text-xs font-semibold text-foreground bg-muted px-2.5 py-1 rounded-full">
             📅 {dateLabel}{timeLabel !== "—" ? ` · ⏰ ${timeLabel}` : ""}
           </span>
@@ -475,26 +636,53 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
             <span className="w-14 text-center mr-3">Paga fora</span>
             <span className="w-16 text-center">Probabilidades</span>
           </div>
+
+          {/* ✅ Time A com badge de placar */}
           <div className="flex items-center py-2">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              <div className="shrink-0 h-16 w-11 rounded-xl bg-blue-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
-                <img src="/silhueta1.png" alt={teamA} className="h-full w-full object-cover" />
+              <div className="relative shrink-0">
+                <div className="h-16 w-11 rounded-xl bg-blue-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
+                  <img src="/silhueta1.png" alt={teamA} className="h-full w-full object-cover" />
+                </div>
+                {/* ✅ Placar sobre a silhueta */}
+                {liveScore && (
+                  <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-md border border-red-700">
+                    {liveScore.homeScore}
+                  </span>
+                )}
               </div>
               <span className="text-sm font-medium text-foreground truncate">{teamA}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{yesOdds}x</span>
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors shrink-0">{Math.round(dispHome)}%</button>
           </div>
+
+          {/* Placar central quando ao vivo */}
+          {liveScore && (
+            <div className="flex justify-center my-2">
+              <LiveScoreBadge score={liveScore} period={liveScore.period} clock={liveScore.clock} />
+            </div>
+          )}
+
+          {/* ✅ Time B com badge de placar */}
           <div className="flex items-center py-2 border-t border-border/30">
             <div className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/mercado/${featured.id}`)}>
-              <div className="shrink-0 h-16 w-11 rounded-xl bg-purple-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
-                <img src="/silhueta2.png" alt={teamB} className="h-full w-full object-cover" />
+              <div className="relative shrink-0">
+                <div className="h-16 w-11 rounded-xl bg-purple-950 border-2 border-white/80 overflow-hidden flex items-center justify-center shadow-md">
+                  <img src="/silhueta2.png" alt={teamB} className="h-full w-full object-cover" />
+                </div>
+                {liveScore && (
+                  <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-md border border-red-700">
+                    {liveScore.awayScore}
+                  </span>
+                )}
               </div>
               <span className="text-sm font-medium text-foreground underline decoration-red-400 underline-offset-2 truncate">{teamB}</span>
             </div>
             <span className="text-xs text-muted-foreground w-14 text-center mr-3">{noOdds}x</span>
             <button onClick={() => onSelect(featured)} className="w-16 h-8 rounded-lg text-sm font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">{Math.round(dispAway)}%</button>
           </div>
+
           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 mt-1 border-t border-border/20">
             <span>{fmtVol((featured as any).volume || 0)} vol</span>
             <span>Espalhe e Total</span>
@@ -507,7 +695,6 @@ function OtherSportsFeaturedCard({ markets, onSelect }: { markets: DBMarket[]; o
             <div className="flex flex-col gap-2">
               {markets.slice(0, 3).map((m, i) => {
                 const t   = (m as any).nome || m.title || "";
-                // ✅ FIX: usa getMarketDate para ler event_date/end_date corretamente
                 const md  = getMarketDate(m as any);
                 const hasT = md ? md.getUTCHours() !== 0 || md.getUTCMinutes() !== 0 : false;
                 const dl  = md ? md.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
@@ -816,15 +1003,17 @@ const Index = () => {
   const sportsMarkets      = useMemo(() => activeMarkets.filter((m) => m.category === "esportes").sort((a, b) => b.volume - a.volume), [activeMarkets]);
   const otherCategories    = useMemo(() => CATEGORIES.filter((c) => c.key !== "esportes").map((cat) => ({ ...cat, markets: activeMarkets.filter((m) => m.category === cat.key).sort((a, b) => b.volume - a.volume) })).filter((c) => c.markets.length > 0), [activeMarkets]);
   const otherSportsMarkets = useMemo(() => {
-    const now    = new Date();
-    const limite = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const now = new Date();
     return activeMarkets
       .filter((m) => ["basquete", "luta", "volei", "tenis"].includes(m.category))
       .filter((m) => {
         const d = getMarketDate(m as any);
         if (!d) return false;
-        const inicioJanela = new Date(d.getTime() - 5 * 60 * 60 * 1000);
-        return now >= inicioJanela && d <= limite;
+        const diasLimite = m.category === "luta" ? 30 : 7;
+        const limite = new Date(now.getTime() + diasLimite * 24 * 60 * 60 * 1000);
+        const aoVivo = d <= now && now <= new Date(d.getTime() + 5 * 60 * 60 * 1000);
+        const futuro = d > now && d <= limite;
+        return aoVivo || futuro;
       })
       .sort((a, b) => (getMarketDate(a as any)?.getTime() ?? 0) - (getMarketDate(b as any)?.getTime() ?? 0));
   }, [activeMarkets]);
@@ -877,7 +1066,7 @@ const Index = () => {
                       <Trophy className="h-4 w-4 text-violet-400" />
                       <h2 className="text-base font-bold text-foreground">Outras Modalidades</h2>
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{otherSportsMarkets.length}</span>
-                      <span className="text-[10px] text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full ml-1">próximos 3 dias</span>
+                      <span className="text-[10px] text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full ml-1">próximos eventos</span>
                     </div>
                     <OtherSportsFeaturedCard markets={otherSportsMarkets} onSelect={setSelectedMarket} />
                   </div>
