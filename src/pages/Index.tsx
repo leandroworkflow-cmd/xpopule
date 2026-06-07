@@ -854,7 +854,7 @@ const Index = () => {
                       <Trophy className="h-4 w-4 text-violet-400" />
                       <h2 className="text-base font-bold text-foreground">Outras Modalidades</h2>
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{otherSportsMarkets.length}</span>
-                      <span className="text-[10px] text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full ml-1">próximos 3 dias</span>
+                      <span className="text-[10px] text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full ml-1">próximos eventos</span>
                     </div>
                     <OtherSportsFeaturedCard markets={otherSportsMarkets} onSelect={setSelectedMarket} />
                   </div>
