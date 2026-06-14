@@ -25,7 +25,7 @@ export function useMarkets(category?: string | null) {
         .from("markets")
         .select("*")
         .eq("status", "active")
-        .gte("end_date", now)
+        .gte("end_date", new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString())
         .order("end_date", { ascending: true });
 
       if (category) {
