@@ -128,13 +128,14 @@ const MarketDetail = () => {
 
   const isBinaryGeneric = yesLabel === "Sim" && noLabel === "Não";
 
-  // ✅ Usa home_logo/away_logo do banco primeiro, depois extractTeamsFromTitle
+  // ✅ Usa home_logo/away_logo do banco — sem extractTeamsFromTitle
   const isFutebol = category === "esportes";
   const homeLogo = (market as any).home_logo || null;
   const awayLogo = (market as any).away_logo || null;
+  const parts    = title.split(/ x | vs /i);
   const teams = isFutebol ? {
-    teamA: { name: (market as any).time_casa || teamsFromTitle?.teamA?.name || title.split(/ x | vs /i)[0]?.trim() || "Time A", logo: homeLogo || teamsFromTitle?.teamA?.logo || "" },
-    teamB: { name: (market as any).time_fora || teamsFromTitle?.teamB?.name || title.split(/ x | vs /i)[1]?.trim() || "Time B", logo: awayLogo || teamsFromTitle?.teamB?.logo || "" },
+    teamA: { name: parts[0]?.trim() || "Time A", logo: homeLogo || "" },
+    teamB: { name: parts[1]?.trim() || "Time B", logo: awayLogo || "" },
   } : null;
 
   return (
