@@ -32,9 +32,23 @@ interface MatchListProps {
 }
 
 export function MatchList({ markets, highlightIndices = [], onNavigate }: MatchListProps) {
-  const matchMarkets = markets
-    .map((m) => ({ market: m, teams: extractTeamsFromTitle(m.title) }))
-    .filter((x): x is { market: DBMarket; teams: MatchTeams } => x.teams !== null);
+  const matchMarkets = markets.map((m) => {
+    const fromTitle = extractTeamsFromTitle(m.title);
+    const parts = m.title.split(/ x | vs /i);
+    const teams: MatchTeams = {
+      teamA: {
+        key:  fromTitle?.teamA?.key  || parts[0]?.trim().toLowerCase() || "a",
+        name: fromTitle?.teamA?.name || parts[0]?.trim() || "Time A",
+        logo: (m as any).home_logo  || fromTitle?.teamA?.logo || "",
+      },
+      teamB: {
+        key:  fromTitle?.teamB?.key  || parts[1]?.trim().toLowerCase() || "b",
+        name: fromTitle?.teamB?.name || parts[1]?.trim() || "Time B",
+        logo: (m as any).away_logo  || fromTitle?.teamB?.logo || "",
+      },
+    };
+    return { market: m, teams };
+  });
 
   if (matchMarkets.length === 0) return null;
 
