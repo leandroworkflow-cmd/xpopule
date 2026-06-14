@@ -128,9 +128,14 @@ const MarketDetail = () => {
 
   const isBinaryGeneric = yesLabel === "Sim" && noLabel === "Não";
 
-  // ✅ Só mostra escudos para futebol (esportes), não para lutas
+  // ✅ Usa home_logo/away_logo do banco primeiro, depois extractTeamsFromTitle
   const isFutebol = category === "esportes";
-  const teams = isFutebol ? extractTeamsFromTitle(title) : null;
+  const homeLogo = (market as any).home_logo || null;
+  const awayLogo = (market as any).away_logo || null;
+  const teams = isFutebol ? {
+    teamA: { name: (market as any).time_casa || teamsFromTitle?.teamA?.name || title.split(/ x | vs /i)[0]?.trim() || "Time A", logo: homeLogo || teamsFromTitle?.teamA?.logo || "" },
+    teamB: { name: (market as any).time_fora || teamsFromTitle?.teamB?.name || title.split(/ x | vs /i)[1]?.trim() || "Time B", logo: awayLogo || teamsFromTitle?.teamB?.logo || "" },
+  } : null;
 
   return (
     <div className="max-w-4xl mx-auto">
