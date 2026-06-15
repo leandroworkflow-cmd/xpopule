@@ -158,7 +158,7 @@ const MarketDetail = () => {
           </div>
 
           {/* Escudos só para futebol */}
-          {teams && (
+          {teams && teams.teamA.logo && teams.teamB.logo && (
             <div className="flex items-center justify-center gap-6 py-4 mb-4 rounded-xl border border-border bg-card/50">
               <div className="flex flex-col items-center gap-2">
                 <img src={teams.teamA.logo} alt={teams.teamA.name} className="h-16 w-16 object-contain" />
