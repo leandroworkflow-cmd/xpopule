@@ -130,8 +130,9 @@ const MarketDetail = () => {
 
   // ✅ Usa home_logo/away_logo do banco — sem extractTeamsFromTitle
   const isFutebol = category === "esportes";
-  const homeLogo = (market as any).home_logo || null;
-  const awayLogo = (market as any).away_logo || null;
+  const bust = '?v=2';
+  const homeLogo = (market as any).home_logo ? (market as any).home_logo + bust : null;
+  const awayLogo = (market as any).away_logo ? (market as any).away_logo + bust : null;
   const parts    = title.split(/ x | vs /i);
   const teams = isFutebol ? {
     teamA: { name: parts[0]?.trim() || "Time A", logo: homeLogo || "" },
