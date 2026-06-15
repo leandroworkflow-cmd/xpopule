@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft, Info, TrendingUp, BarChart3, Sparkles, Lock, X } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { extractTeamsFromTitle } from "@/lib/teamLogos";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
