@@ -46,7 +46,7 @@ const SYNONYMS: Record<string, string> = {
   atletico: "atletico_mg",
 };
 
-const DEFAULT_LOGO = "/escudos/flamengo.png";
+const DEFAULT_LOGO = "";
 
 function normalize(text: string): string {
   return text
