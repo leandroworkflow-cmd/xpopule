@@ -753,7 +753,7 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
         </div>
         <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{title}</p>
         <div className="flex flex-col gap-2">
-          {(opcoes as any[]).slice(0, 3).map((op) => (
+          {(opcoes as any[]).map((op) => (
             <div key={op.id} className="flex items-center gap-3 py-2 px-2 rounded-lg bg-muted/20 border border-border/30 hover:border-primary/30 transition-all">
               {op.foto_url ? <img src={op.foto_url} alt={op.label} className="h-12 w-12 rounded-lg object-cover border-2 border-border/40 shrink-0" onError={(e) => { const t = e.target as HTMLImageElement; t.style.display="none"; const s = t.nextElementSibling as HTMLElement; if(s) s.style.display="flex"; }} /> : null}
               <div className="h-12 w-12 rounded-lg bg-primary/20 border-2 border-primary/30 flex items-center justify-center text-sm font-bold text-primary shrink-0" style={{ display: op.foto_url ? "none" : "flex" }}>{op.label.slice(0,1).toUpperCase()}</div>
@@ -784,7 +784,7 @@ function CategoryMiniCard({ market, onSelect }: { market: DBMarket; onSelect: (m
         </div>
         <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{title}</p>
         <div className="flex flex-col gap-1.5">
-          {(opcoes as any[]).slice(0, 3).map((op) => {
+          {(opcoes as any[]).map((op) => {
             const prob = Number(op.probabilidade) || 0;
             const isLeading = prob === maxProb;
             return (
